@@ -644,17 +644,39 @@ button {
 #play-btn {
   position: relative;
   flex: 1;
-  height: 58px;
-  border-radius: 16px;
-  background: linear-gradient(180deg, var(--gold-hi), var(--gold));
+  height: 62px;
+  border-radius: 17px;
+  background: linear-gradient(180deg, #ffe98f 0%, var(--gold-hi) 42%, var(--gold) 100%);
   border: 1.5px solid #ffe58c;
   color: #201802;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  box-shadow: 0 6px 22px rgba(245, 179, 1, 0.42);
+  overflow: hidden;
+  box-shadow: 0 6px 22px rgba(245, 179, 1, 0.42),
+              inset 0 2px 0 rgba(255, 255, 255, 0.55),
+              inset 0 -3px 7px rgba(150, 90, 0, 0.35);
   animation: play-pulse 2.4s ease-in-out infinite;
+}
+
+/* Brillo diagonal que barre el botón cada tanto */
+#play-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 38%;
+  height: 100%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  transform: skewX(-20deg);
+  animation: play-shine 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes play-shine {
+  0%, 62% { left: -60%; }
+  88%, 100% { left: 135%; }
 }
 
 #play-btn:active {
@@ -668,9 +690,10 @@ button {
 }
 
 .play-text {
-  font-size: 22px;
+  font-size: 23px;
   font-weight: 900;
-  letter-spacing: 2px;
+  letter-spacing: 2.5px;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 
 .play-fuel {
@@ -1165,22 +1188,31 @@ button {
 }
 
 .section-card {
-  width: min(92%, 420px);
-  max-height: 82%;
-  gap: 12px;
+  width: min(92%, 430px);
+  max-height: 84%;
+  gap: 14px;
+  line-height: 1.4;
+  padding: 18px 18px 20px;
+}
+
+.section-card h2 {
+  letter-spacing: 1.4px;
+  margin-bottom: 2px;
 }
 
 .sec-close {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 12px;
+  right: 12px;
 }
 
 .sec-sub {
-  font-size: 10px;
+  font-size: 10.5px;
   color: var(--txt-dim);
-  margin-top: -6px;
-  letter-spacing: 0.3px;
+  margin-top: -8px;
+  margin-bottom: 2px;
+  letter-spacing: 0.4px;
+  line-height: 1.35;
 }
 
 .sec-list {
@@ -1213,7 +1245,7 @@ button {
   display: grid;
   grid-template-columns: 1fr auto auto;
   align-items: center;
-  gap: 8px;
+  gap: 11px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--panel-border);
   border-radius: 11px;
@@ -1227,9 +1259,11 @@ button {
   min-width: 0;
 }
 .mi-desc {
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 700;
-  margin-bottom: 6px;
+  margin-bottom: 7px;
+  letter-spacing: 0.3px;
+  line-height: 1.35;
 }
 .mi-bar {
   height: 5px;
