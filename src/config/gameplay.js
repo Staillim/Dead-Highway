@@ -117,7 +117,9 @@ export const GAMEPLAY = {
     waveMaxS: 3.0,
     crawlChance: 0.12,     // pocos se arrastran (no todos)
     screamChance: 0.35,    // solo algunos gritan al ver el coche
-    detectZ: 70,           // a esta distancia el zombi ve el coche y grita (scream)
+    detectZ: 72,           // a esta distancia el zombi ve el coche y grita (scream)
+    engageZ: 50,           // a esta distancia deja de vagar y PERSIGUE al carro
+    wanderSpeed: 1.4,      // velocidad al deambular (m/s)
     screamHomingMul: 0.45, // antes de gritar avanza lento; tras gritar, a tope
     // curva de dificultad GDD §9: qué tipos según distancia
     unlock: { runner: 500, fat: 1500 },

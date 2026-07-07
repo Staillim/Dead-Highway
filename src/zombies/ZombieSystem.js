@@ -174,6 +174,11 @@ export class ZombieSystem {
     z.screamed = false;
     z.screaming = false;
     z.screamT = 0;
+    // Vagabundeo: cada zombi arranca deambulando con rumbo y giro propios, así
+    // la horda mira y se mueve en distintas direcciones (no todos de frente).
+    z.engaged = false;
+    z.wanderAngle = Math.random() * Math.PI * 2;
+    z.wanderTurnT = 0.5 + Math.random() * 2;
     if (z.crawler) this.playAnim(z, 'crawl');
     else this.playAnim(z, 'procedural');
 
@@ -229,6 +234,9 @@ export class ZombieSystem {
 
       const dx = laneSystem.x - z.x;
 
+      // Engancha (deja de vagar y persigue) cuando el carro se acerca
+      if (!z.engaged && Math.abs(z.z) < zc.engageZ) z.engaged = true;
+
       // Visión: si le toca gritar y el coche entra en su rango → SCREAM y corre
       if (z.willScream && !z.screamed && !z.screaming && Math.abs(z.z) < zc.detectZ) {
         z.screaming = true;
@@ -236,31 +244,42 @@ export class ZombieSystem {
         this.playAnim(z, 'scream', { once: true });
       }
 
-      // Velocidad: arrastrándose y "idle" (antes de gritar) van lento; tras gritar, a tope
-      let homingMul = 1;
-      let velMul = 1;
       if (z.screaming) {
-        homingMul = 0; velMul = 0; // congelado gritando
+        // Congelado gritando; el mundo lo sigue trayendo
+        z.z += worldDz;
+        z.holder.position.set(z.x, 0, z.z);
         z.screamT -= dt;
-        if (z.screamT <= 0) { z.screaming = false; z.screamed = true; this.playAnim(z, 'procedural'); }
-      } else if (z.crawler) {
-        homingMul = 0.6; velMul = 0.55;
-      } else if (z.willScream && !z.screamed) {
-        homingMul = zc.screamHomingMul; velMul = zc.screamHomingMul; // acecha lento antes de gritar
+        if (z.screamT <= 0) { z.screaming = false; z.screamed = true; z.engaged = true; this.playAnim(z, 'procedural'); }
+      } else if (!z.engaged) {
+        // VAGABUNDEO: rumbo propio que cambia cada tanto → mira y anda en
+        // distintas direcciones (adelante, atrás, a los lados). El mundo lo trae.
+        z.wanderTurnT -= dt;
+        if (z.wanderTurnT <= 0) {
+          z.wanderAngle += (Math.random() - 0.5) * 1.8;
+          z.wanderTurnT = 1.2 + Math.random() * 2.5;
+        }
+        const ws = zc.wanderSpeed * (z.crawler ? 0.6 : 1);
+        z.x += Math.sin(z.wanderAngle) * ws * dt;
+        z.z += worldDz + Math.cos(z.wanderAngle) * ws * 0.5 * dt;
+        z.x = THREE.MathUtils.clamp(z.x, -8.5, 8.5); // no salirse demasiado de la vía
+        z.holder.position.set(z.x, 0, z.z);
+        z.holder.rotation.y = z.wanderAngle; // mira hacia donde camina
+      } else {
+        // PERSIGUE: se dirige al carril del carro y lo encara
+        const velMul = z.crawler ? 0.6 : 1;
+        const homingMul = z.crawler ? 0.6 : 1;
+        z.z += worldDz + z.cfg.ownVel * dt * velMul;
+        const homing = z.cfg.homingX * dt * homingMul;
+        z.x += THREE.MathUtils.clamp(dx, -homing, homing);
+        z.holder.position.set(z.x, 0, z.z);
+        z.holder.rotation.y = Math.atan2(dx, Math.max(2, z.z * -1)) * 0.6;
       }
-
-      // Movimiento: el mundo lo trae + su locomoción propia; se dirige al carril
-      z.z += worldDz + z.cfg.ownVel * dt * velMul;
-      const homing = z.cfg.homingX * dt * homingMul;
-      z.x += THREE.MathUtils.clamp(laneSystem.x - z.x, -homing, homing);
-      z.holder.position.set(z.x, 0, z.z);
-      z.holder.rotation.y = Math.atan2(dx, Math.max(2, z.z * -1)) * 0.6;
 
       // Animación procedural de caminar SOLO si no hay clip FBX gobernando
       if (z.animMode === 'procedural') {
-        const walkIntensity = z.walkCfg?.intensity ?? (z.type === 'runner' ? 1 : z.type === 'fat' ? 0.2 : 0.5);
+        const walkIntensity = z.walkCfg?.intensity ?? (z.engaged ? (z.type === 'runner' ? 1 : 0.5) : 0.3);
         const walkHunch = z.walkCfg?.hunch ?? (z.type === 'fat' ? 0.35 : 0.6);
-        z.phase += dt * (4 + z.cfg.run * 6);
+        z.phase += dt * (z.engaged ? (4 + z.cfg.run * 6) : 3);
         z.rig.walk(z.phase, walkIntensity, walkHunch);
       }
 
