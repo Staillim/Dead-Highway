@@ -6,6 +6,7 @@ import { AssetValidator } from '../../asset-pipeline/AssetValidator.js';
 import { MaterialScanner } from '../../asset-pipeline/MaterialScanner.js';
 import { PaintCustomizer } from '../../materials/PaintCustomizer.js';
 import { ZombieRig } from '../../zombies/ZombieRig.js';
+import { loadZombieClips } from '../../zombies/ZombieAnimations.js';
 
 // --- Descubrir assets con Vite ---------------------------------------------
 const assetGlobs = {
@@ -115,9 +116,21 @@ scene.add(dirLight);
 const grid = new THREE.GridHelper(20, 20, 0x444444, 0x222222);
 scene.add(grid);
 
+// Reproducción de clips FBX (Mixamo) sobre el zombi cargado (preview del dev)
+const clipClock = new THREE.Clock();
+let clipMixer = null;
+let clipActions = null;
+let clipPlaying = null;
+let editorClipsPromise = null;
+
 function animate() {
   requestAnimationFrame(animate);
   orbit.update();
+  const dt = clipClock.getDelta();
+  if (clipMixer && clipPlaying) {
+    clipMixer.update(dt);
+    syncSkeletonJoints();   // las bolitas del esqueleto siguen la animación
+  }
   renderer.render(scene, camera);
 }
 animate();
@@ -1595,6 +1608,9 @@ async function loadZombie() {
     scene.remove(state.zombieModel);
     state.zombieModel = null;
   }
+  stopClipPreview();
+  clipMixer = null;
+  clipActions = null;
   clearSkeletonJoints();
   transform.detach();
 
@@ -1604,6 +1620,22 @@ async function loadZombie() {
     scene.add(state.zombieModel);
 
     state.zombieRig = new ZombieRig(state.zombieModel);
+
+    // Mixer + acciones FBX (scream/crawl/biting/death) para previsualizar los
+    // clips reales sobre el zombi completo (mismo pipeline que en la partida).
+    try {
+      if (!editorClipsPromise) editorClipsPromise = loadZombieClips();
+      const clips = await editorClipsPromise;
+      clipMixer = new THREE.AnimationMixer(state.zombieModel);
+      clipActions = {};
+      for (const [k, c] of Object.entries(clips || {})) {
+        if (c) clipActions[k] = clipMixer.clipAction(c);
+      }
+    } catch (e) {
+      console.warn('No se pudieron cargar clips FBX para preview:', e);
+      clipMixer = null; clipActions = null;
+    }
+    clipPlaying = null;
 
     // Cargar config guardada
     try {
@@ -1830,6 +1862,7 @@ function stopAnimPreview() {
 }
 
 function startAnimPreview(mode) {
+  stopClipPreview();   // los clips FBX y el preview procedural pelean por los huesos
   stopAnimPreview();
   state.animPreview = mode;
   state.animPhase = 0;
@@ -1840,6 +1873,38 @@ function startAnimPreview(mode) {
     animTimer = requestAnimationFrame(tick);
   }
   tick();
+}
+
+// Detiene la reproducción de clips FBX y restaura la pose base/postura editable
+function stopClipPreview() {
+  const wasPlaying = clipPlaying;
+  if (clipMixer) clipMixer.stopAllAction();
+  clipPlaying = null;
+  applyCurrentPose();
+  if (wasPlaying) {
+    const st = document.getElementById('z-save-status');
+    if (st) { st.textContent = '⏹ Pose base — editá postura y guardá'; st.className = 'save-status info'; }
+  }
+}
+
+// Reproduce un clip FBX (scream/crawl/biting/death) sobre el zombi cargado
+function playClip(name) {
+  const st = document.getElementById('z-save-status');
+  if (!clipMixer || !clipActions || !clipActions[name]) {
+    if (st) { st.textContent = `Sin clip "${name}" — revisá assets/animations`; st.className = 'save-status err'; }
+    return;
+  }
+  stopAnimPreview();          // cortar el preview procedural
+  clipMixer.stopAllAction();
+  const once = (name === 'death' || name === 'scream');
+  const a = clipActions[name];
+  a.reset();
+  a.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, Infinity);
+  a.clampWhenFinished = once;
+  a.play();
+  clipPlaying = name;
+  clipClock.getDelta();       // descartar dt acumulado mientras estaba parado
+  if (st) { st.textContent = `▶ ${name}`; st.className = 'save-status info'; }
 }
 
 function saveZombie() {
@@ -1886,13 +1951,21 @@ const saveZombieBtn = document.getElementById('save-zombie');
 if (saveZombieBtn) saveZombieBtn.addEventListener('click', saveZombie);
 
 const zBindBtn = document.getElementById('z-pose-bind');
-if (zBindBtn) zBindBtn.addEventListener('click', () => { stopAnimPreview(); applyCurrentPose(); });
+if (zBindBtn) zBindBtn.addEventListener('click', () => { stopClipPreview(); stopAnimPreview(); applyCurrentPose(); });
 
 const zWalkBtn = document.getElementById('z-pose-walk');
 if (zWalkBtn) zWalkBtn.addEventListener('click', () => startAnimPreview('walk'));
 
 const zGrabBtn = document.getElementById('z-pose-grab');
 if (zGrabBtn) zGrabBtn.addEventListener('click', () => startAnimPreview('grab'));
+
+// Clips FBX (Mixamo): previsualizar cada animación sobre el zombi cargado
+for (const clip of ['scream', 'crawl', 'biting', 'death']) {
+  const btn = document.getElementById(`z-clip-${clip}`);
+  if (btn) btn.addEventListener('click', () => playClip(clip));
+}
+const zClipStop = document.getElementById('z-clip-stop');
+if (zClipStop) zClipStop.addEventListener('click', stopClipPreview);
 
 const zScale = document.getElementById('z-scale');
 if (zScale) zScale.addEventListener('input', () => {
