@@ -57,6 +57,43 @@ function findWheels(carModel) {
   return wheels;
 }
 
+// Los coches Tripo traen las ruedas HORNEADAS en la malla (no se pueden girar).
+// Solución: montamos 4 ruedas PROCEDURALES (llanta + rin + rayos) sobre las
+// posiciones de las ruedas, en el grupo raíz (fuera de la escala/rotación del
+// modelo), y giramos esas. Los rayos claros hacen que el giro se vea.
+function createProceduralWheels(root, width, length) {
+  const r = THREE.MathUtils.clamp(width * 0.21, 0.34, 0.62);   // radio proporcional
+  const thick = THREE.MathUtils.clamp(width * 0.16, 0.22, 0.42);
+
+  const tireGeo = new THREE.CylinderGeometry(r, r, thick, 22);
+  tireGeo.rotateZ(Math.PI / 2);                     // eje del cilindro → X (izq-der)
+  const tireMat = new THREE.MeshStandardMaterial({ color: 0x0e0f13, roughness: 0.88, metalness: 0.05 });
+  const hubGeo = new THREE.CylinderGeometry(r * 0.52, r * 0.52, thick * 1.06, 16);
+  hubGeo.rotateZ(Math.PI / 2);
+  const hubMat = new THREE.MeshStandardMaterial({ color: 0xc2c7ce, roughness: 0.3, metalness: 0.8 });
+  const spokeGeo = new THREE.BoxGeometry(thick * 1.08, r * 0.92, r * 0.17);
+  const spokeMat = new THREE.MeshStandardMaterial({ color: 0x808690, roughness: 0.45, metalness: 0.6 });
+
+  const xPos = width * 0.46;
+  const zFront = -length * 0.32;
+  const zRear = length * 0.30;
+  const wheels = [];
+  for (const [sx, z] of [[-1, zFront], [1, zFront], [-1, zRear], [1, zRear]]) {
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(tireGeo, tireMat));
+    g.add(new THREE.Mesh(hubGeo, hubMat));
+    const s1 = new THREE.Mesh(spokeGeo, spokeMat);
+    const s2 = new THREE.Mesh(spokeGeo, spokeMat);
+    s2.rotation.x = Math.PI / 2;                     // cruz de rayos en la cara
+    g.add(s1, s2);
+    g.position.set(sx * xPos, r, z);
+    g.traverse((o) => { o.frustumCulled = false; });
+    root.add(g);
+    wheels.push(g);
+  }
+  return { wheels, radius: r };
+}
+
 // El carro del jugador en la partida: mismo carro equipado del garaje (mismo
 // pipeline de sockets), normalizado a escala real (~4.3 m), con rebote sutil,
 // inclinación al cambiar de carril y sombra de contacto (sin shadow map).
@@ -101,6 +138,15 @@ export class PlayerVehicle {
     if (wheelMeshes.length === 0) {
       wheelMeshes = findWheels(carModel);
     }
+    // Si el modelo no expone ruedas girables (geometría fusionada), montamos
+    // ruedas procedurales sobre el chasis para que SÍ se vean girar.
+    let proceduralWheels = null;
+    let pwRadius = GAMEPLAY.vehicle.wheelRadius;
+    if (wheelMeshes.length === 0) {
+      const pw = createProceduralWheels(root, w, l);
+      proceduralWheels = pw.wheels;
+      pwRadius = pw.radius;
+    }
 
     return new PlayerVehicle(root, {
       width: w, length: l,
@@ -109,11 +155,13 @@ export class PlayerVehicle {
       turretMuzzles,
       hoodMuzzles,
       wheelMeshes,
+      proceduralWheels,
+      pwRadius,
       log
     });
   }
 
-  constructor(root, { width, length, equippedCarId, accessoryNodes, turretMuzzles, hoodMuzzles, wheelMeshes, log }) {
+  constructor(root, { width, length, equippedCarId, accessoryNodes, turretMuzzles, hoodMuzzles, wheelMeshes, proceduralWheels, pwRadius, log }) {
     this.object3D = root;
     this.width = width;
     this.length = length;
@@ -122,6 +170,8 @@ export class PlayerVehicle {
     this.turretMuzzles = turretMuzzles;
     this.hoodMuzzles = hoodMuzzles;
     this.wheelMeshes = wheelMeshes || [];
+    this.proceduralWheels = proceduralWheels || null;
+    this.pwRadius = pwRadius || GAMEPLAY.vehicle.wheelRadius;
     this.log = log;
     this.time = 0;
   }
@@ -142,7 +192,11 @@ export class PlayerVehicle {
     root.rotation.z = -laneSystem.lean;
     root.rotation.y = -laneSystem.lean * 0.5;
 
-    if (this.wheelMeshes.length > 0 && speed > 0.5) {
+    // Ruedas procedurales: ruedan alrededor de su eje X con la velocidad
+    if (this.proceduralWheels && speed > 0.2) {
+      const rot = speed * dt / this.pwRadius;
+      for (const w of this.proceduralWheels) w.rotation.x -= rot;
+    } else if (this.wheelMeshes.length > 0 && speed > 0.5) {
       const rot = speed * dt / wheelRadius;
       for (const wheel of this.wheelMeshes) {
         if (!wheel.userData._spinAxis) {
