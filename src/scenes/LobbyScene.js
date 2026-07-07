@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { loadEquipped } from '../vehicles/EquippedLoader.js';
+import { normalizeModel, measureModel } from '../utils/measure.js';
 
 // Toda la calibración visual del escenario vive acá.
 // La regla de composición: la cámara es FIJA y el fondo se posiciona para que
@@ -252,25 +253,9 @@ export class LobbyScene {
     this.debugEntries = log;
     this.carHolder.add(this.carModel);
 
-    // Normalizar SIEMPRE al mismo largo objetivo: cada coche llega con escala/pivot
-    // propios (los GLB de Sketchfab varían muchísimo), y sin esto unos aparecen
-    // diminutos o gigantes. Reset de transform antes de medir para que sea estable.
-    this.carHolder.scale.setScalar(1);
-    this.carModel.position.set(0, 0, 0);
-    this.carModel.updateMatrixWorld(true);
-    // precise=true mide los VÉRTICES reales: los GLB con nodos anidados de escala
-    // rara (monster truck) engañan al setFromObject normal y salían ×240.
-    const rawBox = new THREE.Box3().setFromObject(this.carModel, true);
-    const rawSize = rawBox.getSize(new THREE.Vector3());
-    const length = Math.max(rawSize.x, rawSize.z, 0.01);
-    const norm = STAGE.car.targetLength / length;
-    this.carHolder.scale.setScalar(norm);
-
-    // Centrar en XZ y plantar la base en el suelo (pivots inconsistentes)
-    const center = rawBox.getCenter(new THREE.Vector3());
-    this.carModel.position.x = -center.x;
-    this.carModel.position.z = -center.z;
-    this.carModel.position.y = -rawBox.min.y;
+    // Normalización ROBUSTA (mide vértices reales) al largo objetivo del lobby,
+    // planta la base en el suelo y centra. Resuelve coches flotando/gigantes.
+    normalizeModel(this.carModel, this.carHolder, STAGE.car.targetLength);
 
     // Sombras + acabado metálico/reflectante en todos los materiales
     this.carHolder.traverse((child) => {

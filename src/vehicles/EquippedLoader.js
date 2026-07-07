@@ -3,6 +3,7 @@ import { AssetLoader } from '../asset-pipeline/AssetLoader.js';
 import { SocketLoader } from '../systems/sockets/SocketLoader.js';
 import { AttachmentSystem } from '../systems/sockets/AttachmentSystem.js';
 import { PaintCustomizer } from '../materials/PaintCustomizer.js';
+import { measureModel } from '../utils/measure.js';
 
 // Carpetas de assets por tipo de socket (compartido por lobby, partida y debug)
 export const ACCESSORY_FOLDERS = {
@@ -103,7 +104,7 @@ function createFallbackSockets(carId, carModel = null) {
 
   // Medir el carro en su espacio local para colocar los accesorios SOBRE él,
   // con una escala proporcional a su tamaño (unidades del GLB varían muchísimo).
-  const box = new THREE.Box3().setFromObject(carModel, true); // precise: vértices reales
+  const box = measureModel(carModel); // vértices reales (robusto para GLB de IA)
   const c = box.getCenter(new THREE.Vector3());
   const size = box.getSize(new THREE.Vector3());
   const span = Math.max(size.x, size.z, 0.01);

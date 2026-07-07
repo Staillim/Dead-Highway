@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GAMEPLAY } from '../config/gameplay.js';
 import { loadEquipped } from './EquippedLoader.js';
 import { createContactShadow } from '../vfx/ContactShadowFactory.js';
+import { normalizeModel } from '../utils/measure.js';
 
 function extractMuzzles(socketData, equipped, type) {
   if (!socketData?.overrides) return [];
@@ -84,23 +85,14 @@ export class PlayerVehicle {
     const holder = new THREE.Group();
     holder.add(carModel);
 
-    // Normalizar a largo real de juego
-    const rawBox = new THREE.Box3().setFromObject(carModel);
-    const rawSize = rawBox.getSize(new THREE.Vector3());
-    const length = Math.max(rawSize.x, rawSize.z);
-    const [minL, maxL] = GAMEPLAY.vehicle.normalizeIfOutside;
-    const norm =
-      length < minL || length > maxL ? GAMEPLAY.vehicle.targetLength / length : 1;
-    holder.scale.setScalar(norm);
-
-    // Centrar horizontalmente respetando el pivot vertical del asset
-    const center = rawBox.getCenter(new THREE.Vector3());
-    carModel.position.x = -center.x;
-    carModel.position.z = -center.z;
+    // Normalización ROBUSTA (vértices reales): siempre al largo objetivo del
+    // juego, base en el suelo, centrado. Los GLB de Sketchfab traen escalas
+    // dementes que rompían el setFromObject normal (coches gigantes/flotando).
+    const { size: rawSize } = normalizeModel(carModel, holder, GAMEPLAY.vehicle.targetLength);
+    const norm = holder.scale.x;
 
     // Auto-deteccion: si el modelo es mas ancho que largo (Sketchfab exporta
     // muchos autos con el frente en +X), se aplica correccion de -90°.
-    // Misma logica usada por el assembly-editor en modo dev.
     let yawFix = 0;
     if (rawSize.x > rawSize.z * 1.2) {
       yawFix = -Math.PI / 2;
