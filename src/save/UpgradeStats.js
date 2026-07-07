@@ -26,9 +26,13 @@ export function computeUpgradeStats(state) {
     speedMul: 1 + (lvl('engine') - 1) * 0.03,                // +3% velocidad por nivel
     // Llantas: manejo (cambio de carril más ágil)
     laneSpeedMul: 1 + (lvl('tires') - 1) * 0.04,
-    // Escudo: recupera un poco de combustible al chocar (mitiga)
+    // Escudo: cargas que absorben un choque (sin perder corazón) y se recargan
     shieldLevel: lvl('shield'),
+    shieldCharges: lvl('shield') >= 2 ? 1 + Math.floor((lvl('shield') - 2) / 3) : 0,
+    shieldRegenS: Math.max(4, 14 - lvl('shield')),
+    // Nitro: sube el techo del acelerador (pedal de gas)
     nitroLevel: lvl('nitro'),
+    boostMul: 1.35 + Math.max(0, lvl('nitro') - 1) * 0.04,
     // Poder total aproximado para mostrar
     power: Object.keys(VEHICLE_UPGRADES).reduce((s, k) => s + lvl(k) * 120, 0)
   };

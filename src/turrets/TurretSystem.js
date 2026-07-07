@@ -81,6 +81,19 @@ export class TurretSystem {
       this.casings.push({ mesh: m, active: false, life: 0, vel: new THREE.Vector3(), spin: 0 });
     }
     this.casingCursor = 0;
+
+    // Chispas de impacto: destello aditivo breve al pegarle a un zombi
+    this.sparks = [];
+    for (let i = 0; i < 14; i++) {
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({
+        color: 0xfff0a0, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false
+      }));
+      s.visible = false;
+      s.scale.setScalar(0.6);
+      scene.add(s);
+      this.sparks.push({ sprite: s, life: 0 });
+    }
+    this.sparkCursor = 0;
   }
 
   // Tinte de la torreta (editable). Aplica a los materiales del modelo de torreta.
@@ -122,6 +135,18 @@ export class TurretSystem {
     c.vel.set((Math.random() - 0.3) * 2.5, 1.5 + Math.random(), 1 + Math.random() * 2);
     c.spin = (Math.random() - 0.5) * 20;
     c.mesh.visible = true;
+  }
+
+  // Destello de impacto al pegarle a un zombi (feedback de las balas)
+  spawnHitSpark(x, y, z) {
+    const s = this.sparks[this.sparkCursor];
+    this.sparkCursor = (this.sparkCursor + 1) % this.sparks.length;
+    s.sprite.position.set(x, y, z);
+    s.sprite.material.color.setHex(this.bulletCfg.color || 0xfff0a0);
+    s.sprite.material.opacity = 1;
+    s.sprite.scale.setScalar(0.45 + Math.random() * 0.35);
+    s.sprite.visible = true;
+    s.life = 0.12;
   }
 
   getMuzzles() {
@@ -287,6 +312,15 @@ export class TurretSystem {
       if (c.life <= 0 || c.mesh.position.y < 0) { c.active = false; c.mesh.visible = false; }
     }
 
+    // Chispas de impacto: se apagan y crecen un poco
+    for (const s of this.sparks) {
+      if (s.life <= 0) continue;
+      s.life -= dt;
+      s.sprite.material.opacity = Math.max(0, s.life / 0.12);
+      s.sprite.scale.multiplyScalar(1 + dt * 5);
+      if (s.life <= 0) s.sprite.visible = false;
+    }
+
     for (const p of this.pool) {
       if (!p.active) continue;
       p.life -= dt;
@@ -308,6 +342,7 @@ export class TurretSystem {
         if (this._segDist2(t.x, t.z, ax, az, bx, bz) >= 1.44) continue;
         if (p.explodeR > 0) { this._explodeAt(t.x, t.z, p.explodeR, dmg); this.deactivate(p); break; }
         this.zombies.hit(t, dmg);
+        this.spawnHitSpark(t.x, 0.95, t.z);   // destello de impacto
         p.hitSet.add(t);
         if (p.pierce > 0) { p.pierce--; p.target = null; } // atraviesa: sigue recto
         else { this.deactivate(p); break; }

@@ -26,6 +26,7 @@ export class RunHUD {
         <div id="run-hud">
           <button id="run-pause-btn" aria-label="Pausa">${PAUSE_ICON}</button>
           <div class="run-chip" id="run-hearts">❤❤❤</div>
+          <div class="run-chip" id="run-shield" hidden>🛡<b id="run-shield-n">0</b></div>
           <div class="run-chip" id="run-distance"><span id="run-distance-val">0 m</span><small>DISTANCIA</small></div>
           <div class="run-chip" id="run-speed">0 km/h</div>
         </div>
@@ -57,6 +58,8 @@ export class RunHUD {
       });
       this.el = {
         hearts: this.root.querySelector('#run-hearts'),
+        shield: this.root.querySelector('#run-shield'),
+        shieldN: this.root.querySelector('#run-shield-n'),
         dist: this.root.querySelector('#run-distance-val'),
         speed: this.root.querySelector('#run-speed'),
         fuel: this.root.querySelector('#run-fuel'),
@@ -108,6 +111,20 @@ export class RunHUD {
       this.el.hearts.classList.remove('hit');
       void this.el.hearts.offsetWidth;
       this.el.hearts.classList.add('hit');
+    }
+  }
+
+  // Escudo (mejora): muestra las cargas disponibles; se oculta si no hay escudo
+  setShield(n, max) {
+    if (!this.el?.shield) return;
+    if (!max || max <= 0) { this.el.shield.hidden = true; return; }
+    this.el.shield.hidden = false;
+    this.el.shieldN.textContent = n;
+    this.el.shield.classList.toggle('depleted', n <= 0);
+    if (n > 0) {
+      this.el.shield.classList.remove('pulse');
+      void this.el.shield.offsetWidth;
+      this.el.shield.classList.add('pulse');
     }
   }
 

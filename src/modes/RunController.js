@@ -48,7 +48,8 @@ export class RunController {
     // El boost es un surge relativo al crucero (~+60%), con techo absoluto, para
     // que se sienta al acelerar sin triplicar la velocidad al principio.
     const cruise = Math.min(max, base + this.distance * gainPerMeter) * this.speedMul;
-    const boost = Math.min(max * this.speedMul * (boostMul || 1.35), cruise * 1.6);
+    const boostCeil = this.boostMul || boostMul || 1.35;   // nitro sube el techo
+    const boost = Math.min(max * this.speedMul * boostCeil, cruise * 1.6);
     const desired = (cruise + (boost - cruise) * thr) * this.slow;
 
     if (this.outOfFuel) {

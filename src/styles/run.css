@@ -95,6 +95,32 @@
   text-shadow: 0 0 8px rgba(255, 70, 60, 0.45);
 }
 
+#run-shield {
+  font-size: 13px;
+  padding: 7px 9px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: #6fc3ff;
+  border-color: rgba(90, 170, 255, 0.35);
+  text-shadow: 0 0 8px rgba(80, 170, 255, 0.5);
+}
+
+#run-shield b {
+  font-weight: 900;
+}
+
+#run-shield.depleted {
+  color: #6a7078;
+  border-color: var(--panel-border);
+  text-shadow: none;
+  opacity: 0.55;
+}
+
+#run-shield.pulse {
+  animation: hearts-hit 0.4s ease;
+}
+
 /* Indicador de combustible: pastilla compacta abajo-centro (discreto, premium) */
 #run-fuel {
   position: absolute;

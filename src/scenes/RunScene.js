@@ -90,6 +90,14 @@ export class RunScene {
     this.turret.setBulletType(ammoOverride && GAMEPLAY.turret.bulletTypes[ammoOverride] ? ammoOverride : st.ammoType);
     // Llantas: cambio de carril más ágil
     this.laneSystem.changeMul = st.laneSpeedMul;
+    // Nitro: techo del acelerador
+    this.controller.boostMul = st.boostMul;
+    // Escudo: cargas que absorben choques y se recargan solas
+    this.shieldMax = st.shieldCharges;
+    this.shieldRegenS = st.shieldRegenS;
+    this.shield = this.shieldMax;
+    this.shieldTimer = 0;
+    this.hud?.setShield?.(this.shield, this.shieldMax);
   }
 
   async load({ equipped }) {
@@ -229,6 +237,7 @@ export class RunScene {
 
     this.hud.mount();
     this.hud.setHearts(this.hp, this.maxHp);
+    this.hud.setShield(this.shield, this.shieldMax);
     this.input.setEnabled(true);
     this.mounted = true;
     this.resize();
@@ -285,8 +294,18 @@ export class RunScene {
     else this.hud.hidePause();
   }
 
-  // Golpe contra un obstáculo: pierde un corazón, sacude y frena; 0 → fin de run
+  // Golpe contra un obstáculo: pierde un corazón, sacude y frena; 0 → fin de run.
+  // El ESCUDO (mejora) absorbe el golpe sin perder corazón y luego se recarga.
   onCrash() {
+    if (this.shield > 0) {
+      this.shield -= 1;
+      this.shieldTimer = this.shieldRegenS;
+      this.hud.setShield(this.shield, this.shieldMax);
+      this.chaseCamera.addImpulse(0.9);
+      this.speedFx.addImpact(0.8);
+      this.controller.applyImpactSlow();
+      return; // sin daño: el escudo aguantó
+    }
     this.hp -= 1;
     this.hud.setHearts(this.hp, this.maxHp);
     this.chaseCamera.addImpulse(1.3);
@@ -484,6 +503,15 @@ export class RunScene {
       this.tumbleweeds.update(dt, speed * dt);
       this.tumbleweeds.collide(this.laneSystem.x, (x, z) => this.speedFx.burst(x, z, 8));
       this.applyBiome();
+      // Escudo: recarga una carga tras shieldRegenS segundos sin gastarlo
+      if (this.shieldMax > 0 && this.shield < this.shieldMax) {
+        this.shieldTimer -= dt;
+        if (this.shieldTimer <= 0) {
+          this.shield += 1;
+          this.shieldTimer = this.shieldRegenS;
+          this.hud.setShield(this.shield, this.shieldMax);
+        }
+      }
       this.speedFx.update(dt, speed, this.vehicle);
       this.chaseCamera.update(dt, this.laneSystem, speed);
       this.hud.update(this.controller.snapshot());
