@@ -243,6 +243,15 @@
     "spikes": {
       "hidden": [],
       "exclusive": []
+    },
+    "zombie": {
+      "hidden": [],
+      "exclusive": []
     }
+  },
+  "meshGroups": {
+    "wheels": [],
+    "turretPart": [],
+    "hoodPart": []
   }
 }
