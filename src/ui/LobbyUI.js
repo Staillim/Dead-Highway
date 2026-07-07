@@ -2,6 +2,8 @@ import { ICONS, carSilhouette } from './icons.js';
 import { VEHICLE_UPGRADES, VEHICLE_STATS, GARAGE_CARS } from '../vehicles/VehicleConfig.js';
 import { TURRETS, TURRET_NAMES } from '../vehicles/TurretData.js';
 import { PlayerState } from '../save/PlayerState.js';
+import { ensureDailyMissions, claimMission } from '../save/Missions.js';
+import { SHOP_BUNDLES, CRATES, EVENTS, buyBundle, openCrate, claimEventMilestone, canAfford } from '../save/Economy.js';
 
 // Metadatos de presentación de cada mejora (los niveles viven en PlayerState.upgrades)
 const UPGRADE_META = {
@@ -60,6 +62,7 @@ export class LobbyUI {
       ${this.renderSheet()}
       <div id="toast" role="status"></div>
       ${this.renderStatsModal()}
+      ${this.renderSectionModal()}
     `;
     this.bind();
     this.ensureOffer();
@@ -463,6 +466,21 @@ export class LobbyUI {
         case 'pass':
           this.toast('Pase de batalla: próximamente');
           break;
+        case 'buy-bundle':
+          this.doBuyBundle(el.dataset.id);
+          break;
+        case 'open-crate':
+          this.doOpenCrate(el.dataset.id);
+          break;
+        case 'claim-mission':
+          this.doClaimMission(el.dataset.key);
+          break;
+        case 'claim-event':
+          this.doClaimEvent(el.dataset.id, +el.dataset.at);
+          break;
+        case 'close-section':
+          this.closeSection();
+          break;
       }
     });
   }
@@ -478,9 +496,212 @@ export class LobbyUI {
       case 'turrets':
         this.setView('turrets');
         break;
+      case 'shop':
+      case 'crates':
+      case 'events':
+      case 'missions':
+        this.openSection(id);
+        break;
       default:
         this.toast('Próximamente');
     }
+  }
+
+  // ---------- Apartados del lobby (Tienda / Cajas / Eventos / Misiones) ----------
+
+  renderSectionModal() {
+    return `
+      <div id="section-modal" hidden>
+        <div class="modal-backdrop" data-action="close-section"></div>
+        <div class="modal-card section-card">
+          <button class="close-btn sec-close" data-action="close-section" aria-label="Cerrar">✕</button>
+          <div id="section-body"></div>
+        </div>
+      </div>`;
+  }
+
+  openSection(id) {
+    this.section = id;
+    document.getElementById('section-body').innerHTML = this.renderSection(id);
+    document.getElementById('section-modal').hidden = false;
+  }
+
+  closeSection() {
+    document.getElementById('section-modal').hidden = true;
+    this.section = null;
+  }
+
+  refreshSection() {
+    if (this.section) document.getElementById('section-body').innerHTML = this.renderSection(this.section);
+  }
+
+  // Persiste y refresca los chips de recursos + el apartado abierto
+  persistAndRefresh() {
+    PlayerState.save(this.state);
+    this.refreshResources();
+    this.refreshSection();
+  }
+
+  renderSection(id) {
+    switch (id) {
+      case 'shop': return this.renderShop();
+      case 'crates': return this.renderCrates();
+      case 'events': return this.renderEvents();
+      case 'missions': return this.renderMissions();
+      default: return '';
+    }
+  }
+
+  // Chips de recompensa y de coste reutilizables
+  rewardChips(r) {
+    const p = [];
+    if (r?.coins) p.push(`<span class="rw">${ICONS.coin}${fmt(r.coins)}</span>`);
+    if (r?.gems) p.push(`<span class="rw">${ICONS.gem}${r.gems}</span>`);
+    return p.join('');
+  }
+
+  costLabel(cost) {
+    if (!cost) return '';
+    if (cost.real) return `<span class="cost real">${cost.real}</span>`;
+    const p = [];
+    if (cost.coins) p.push(`<span class="cost">${ICONS.coin}${fmt(cost.coins)}</span>`);
+    if (cost.gems) p.push(`<span class="cost">${ICONS.gem}${cost.gems}</span>`);
+    return p.join('');
+  }
+
+  renderMissions() {
+    const m = ensureDailyMissions(this.state);
+    const hrs = Math.max(1, Math.ceil((m.resetAt - Date.now()) / 3600000));
+    const rows = m.items.map((it) => {
+      const pct = Math.min(100, Math.round((it.progress / it.goal) * 100));
+      const done = it.progress >= it.goal;
+      const cta = it.claimed
+        ? `<span class="mi-claimed">✓ Reclamado</span>`
+        : done
+          ? `<button class="btn-primary mi-claim" data-action="claim-mission" data-key="${it.key}">RECLAMAR</button>`
+          : `<span class="mi-prog">${fmt(it.progress)}/${fmt(it.goal)}</span>`;
+      return `
+        <div class="mi-row ${done && !it.claimed ? 'ready' : ''}">
+          <div class="mi-info">
+            <div class="mi-desc">${it.desc}</div>
+            <div class="mi-bar"><i style="width:${pct}%"></i></div>
+          </div>
+          <div class="mi-reward">${this.rewardChips(it.reward)}</div>
+          <div class="mi-cta">${cta}</div>
+        </div>`;
+    }).join('');
+    return `
+      <h2>Misiones diarias</h2>
+      <p class="sec-sub">Se renuevan en ${hrs} h · el progreso se suma al terminar cada carrera</p>
+      <div class="sec-list">${rows}</div>`;
+  }
+
+  renderShop() {
+    const cards = SHOP_BUNDLES.map((b) => {
+      const afford = b.kind === 'iap' ? true : canAfford(this.state, b.cost);
+      return `
+        <button class="shop-card ${b.kind}" data-action="buy-bundle" data-id="${b.id}" ${afford ? '' : 'disabled'}>
+          <span class="shop-ic">${ICONS[b.icon] || ''}</span>
+          <span class="shop-tt">${b.title}</span>
+          <span class="shop-sub">${b.sub}</span>
+          <span class="shop-cost">${this.costLabel(b.cost)}</span>
+        </button>`;
+    }).join('');
+    return `
+      <h2>Tienda</h2>
+      <p class="sec-sub">Cambia gemas por monedas y consigue ventajas</p>
+      <div class="shop-grid">${cards}</div>`;
+  }
+
+  renderCrates() {
+    const cards = CRATES.map((c) => {
+      const afford = canAfford(this.state, c.cost);
+      const odds = c.table.map((e) => this.rewardChips(e.reward)).join('<span class="dim"> · </span>');
+      return `
+        <div class="crate-card r${c.rarity}">
+          <div class="crate-ic">${ICONS.chest}</div>
+          <div class="crate-tt">${c.title} <span class="stars">${this.stars(c.rarity)}</span></div>
+          <div class="crate-odds">${odds}</div>
+          <button class="btn-primary" data-action="open-crate" data-id="${c.id}" ${afford ? '' : 'disabled'}>ABRIR&nbsp;${this.costLabel(c.cost)}</button>
+        </div>`;
+    }).join('');
+    return `
+      <h2>Cajas</h2>
+      <p class="sec-sub">Ábrelas para premios aleatorios</p>
+      <div class="crate-grid">${cards}</div>
+      <div id="crate-result"></div>`;
+  }
+
+  renderEvents() {
+    const blocks = EVENTS.map((ev) => {
+      const value = (this.state.stats && this.state.stats[ev.stat]) || 0;
+      const cap = ev.milestones[ev.milestones.length - 1].at;
+      const pct = Math.min(100, Math.round((value / cap) * 100));
+      const steps = ev.milestones.map((m) => {
+        const claimed = this.state.eventsClaimed?.[`${ev.id}:${m.at}`];
+        const ready = value >= m.at && !claimed;
+        const cta = claimed
+          ? `<span class="mi-claimed">✓</span>`
+          : ready
+            ? `<button class="btn-primary" data-action="claim-event" data-id="${ev.id}" data-at="${m.at}">RECLAMAR</button>`
+            : `<span class="mi-prog">${fmt(Math.min(value, m.at))}/${fmt(m.at)}</span>`;
+        return `
+          <div class="ev-step ${ready ? 'ready' : ''}">
+            <span class="ev-goal">${fmt(m.at)} ${ev.unit}</span>
+            <span class="ev-rw">${this.rewardChips(m.reward)}</span>
+            ${cta}
+          </div>`;
+      }).join('');
+      return `
+        <div class="ev-card">
+          <div class="ev-head"><span class="ev-ic">${ICONS[ev.icon] || ''}</span>
+            <div><div class="ev-tt">${ev.title}</div><div class="ev-desc">${ev.desc}</div></div></div>
+          <div class="mi-bar"><i style="width:${pct}%"></i></div>
+          <div class="ev-steps">${steps}</div>
+        </div>`;
+    }).join('');
+    return `
+      <h2>Eventos</h2>
+      <p class="sec-sub">El progreso se acumula entre carreras</p>
+      <div class="sec-list">${blocks}</div>`;
+  }
+
+  doBuyBundle(id) {
+    const res = buyBundle(this.state, id);
+    if (res.error === 'iap') { this.toast('Pago real: próximamente'); return; }
+    if (res.error === 'insufficient') { this.toast('Recursos insuficientes'); return; }
+    if (res.error) { this.toast('No disponible'); return; }
+    if (res.bundle?.grant?.fuelFull) this.state.fuel = this.state.maxFuel;
+    this.persistAndRefresh();
+    this.toast('¡Comprado!');
+  }
+
+  doOpenCrate(id) {
+    const res = openCrate(this.state, id);
+    if (res.error === 'insufficient') { this.toast('Recursos insuficientes'); return; }
+    if (res.error) { this.toast('No disponible'); return; }
+    this.persistAndRefresh();
+    const el = document.getElementById('crate-result');
+    if (el) el.innerHTML = `<div class="crate-win anim-in">¡Ganaste!&nbsp;${this.rewardChips(res.reward)}</div>`;
+  }
+
+  doClaimMission(key) {
+    const r = claimMission(this.state, key);
+    if (!r) { this.toast('Misión no completada'); return; }
+    this.persistAndRefresh();
+    const parts = [];
+    if (r.coins) parts.push(`${fmt(r.coins)} monedas`);
+    if (r.gems) parts.push(`${r.gems} gemas`);
+    this.toast(`Recompensa: ${parts.join(' + ')}`);
+  }
+
+  doClaimEvent(id, at) {
+    const res = claimEventMilestone(this.state, id, at);
+    if (res.error === 'locked') { this.toast('Aún no alcanzas el hito'); return; }
+    if (res.error === 'claimed') { this.toast('Ya reclamado'); return; }
+    if (res.error) { this.toast('No disponible'); return; }
+    this.persistAndRefresh();
+    this.toast('¡Hito reclamado!');
   }
 
   // Abre el Modo Dev (Assembly Editor) con el carro equipado ya cargado

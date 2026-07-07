@@ -1150,6 +1150,286 @@ button {
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+/* ---------- Apartados del lobby (Tienda / Cajas / Eventos / Misiones) ---------- */
+
+#section-modal {
+  position: absolute;
+  inset: 0;
+  z-index: 62;
+  display: grid;
+  place-items: center;
+}
+
+#section-modal[hidden] {
+  display: none;
+}
+
+.section-card {
+  width: min(92%, 420px);
+  max-height: 82%;
+  gap: 12px;
+}
+
+.sec-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.sec-sub {
+  font-size: 10px;
+  color: var(--txt-dim);
+  margin-top: -6px;
+  letter-spacing: 0.3px;
+}
+
+.sec-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Chips de recompensa y coste */
+.rw,
+.cost {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.rw svg,
+.cost svg {
+  width: 13px;
+  height: 13px;
+}
+.cost.real {
+  color: var(--gold-hi);
+}
+
+/* Misiones */
+.mi-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--panel-border);
+  border-radius: 11px;
+  padding: 9px 10px;
+}
+.mi-row.ready {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px rgba(245, 179, 1, 0.25) inset;
+}
+.mi-info {
+  min-width: 0;
+}
+.mi-desc {
+  font-size: 11.5px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.mi-bar {
+  height: 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+.mi-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--gold), var(--gold-hi));
+}
+.mi-reward {
+  display: flex;
+  gap: 6px;
+  color: var(--gold-hi);
+}
+.mi-prog {
+  font-size: 10px;
+  color: var(--txt-dim);
+  font-weight: 800;
+}
+.mi-claimed {
+  font-size: 10px;
+  color: #6fcf7f;
+  font-weight: 800;
+}
+.mi-claim {
+  padding: 6px 10px;
+  font-size: 10px;
+}
+
+/* Tienda */
+.shop-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.shop-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 12px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  color: inherit;
+  cursor: pointer;
+  text-align: center;
+  transition: transform 0.1s ease, border-color 0.1s ease;
+}
+.shop-card:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.shop-card:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.shop-card.iap {
+  border-color: rgba(245, 179, 1, 0.4);
+}
+.shop-ic svg {
+  width: 30px;
+  height: 30px;
+}
+.shop-tt {
+  font-size: 12px;
+  font-weight: 900;
+}
+.shop-sub {
+  font-size: 9px;
+  color: var(--txt-dim);
+  line-height: 1.2;
+}
+.shop-cost {
+  margin-top: 4px;
+}
+
+/* Cajas */
+.crate-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.crate-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  text-align: center;
+}
+.crate-card.r3 {
+  border-color: rgba(120, 190, 255, 0.5);
+  background: linear-gradient(180deg, rgba(80, 150, 255, 0.1), rgba(255, 255, 255, 0.03));
+}
+.crate-ic svg {
+  width: 40px;
+  height: 40px;
+  color: var(--gold);
+}
+.crate-card.r3 .crate-ic svg {
+  color: #7cc4ff;
+}
+.crate-tt {
+  font-size: 12px;
+  font-weight: 900;
+}
+.crate-odds {
+  font-size: 10px;
+  color: var(--txt-dim);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+}
+.crate-card .btn-primary {
+  padding: 8px 10px;
+  font-size: 11px;
+  width: 100%;
+}
+.crate-win {
+  margin-top: 4px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--gold-hi);
+  padding: 8px;
+  border: 1px dashed var(--gold);
+  border-radius: 10px;
+}
+.crate-win .rw svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Eventos */
+.ev-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--panel-border);
+  border-radius: 13px;
+  padding: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.ev-head {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+}
+.ev-ic svg {
+  width: 26px;
+  height: 26px;
+  color: var(--gold);
+}
+.ev-tt {
+  font-size: 12.5px;
+  font-weight: 900;
+}
+.ev-desc {
+  font-size: 9.5px;
+  color: var(--txt-dim);
+}
+.ev-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ev-step {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 10.5px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 9px;
+}
+.ev-step.ready {
+  box-shadow: 0 0 0 1px var(--gold) inset;
+}
+.ev-goal {
+  font-weight: 800;
+}
+.ev-rw {
+  display: flex;
+  gap: 6px;
+  color: var(--gold-hi);
+}
+.ev-step .btn-primary {
+  padding: 5px 9px;
+  font-size: 9.5px;
+}
+
 /* ---------- Overlay de carga ---------- */
 
 #loading-overlay {

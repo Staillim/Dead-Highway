@@ -33,8 +33,16 @@ const DEFAULT_STATE = {
   stats: {
     bestDistance: 0,
     lastDistance: 0,
-    runsPlayed: 0
+    runsPlayed: 0,
+    totalKills: 0,      // zombis eliminados (acumulado histórico)
+    fatKills: 0,        // gordos reventados (acumulado)
+    totalDistance: 0,   // metros recorridos (acumulado)
+    gasCollected: 0     // bidones recogidos (acumulado)
   },
+  // Misiones diarias: se regeneran cada 24h (ver save/Missions.js)
+  missions: null,
+  // Hitos de evento ya reclamados: { 'marathon:5000': true, ... }
+  eventsClaimed: {},
   // Timestamp (ms) en que expira la oferta especial; se regenera al vencer
   offerEndsAt: null
 };
@@ -51,7 +59,8 @@ export class PlayerState {
           equipped: { ...DEFAULT_STATE.equipped, ...parsed.equipped },
           upgrades: { ...DEFAULT_UPGRADES, ...parsed.upgrades },
           battlePass: { ...DEFAULT_STATE.battlePass, ...parsed.battlePass },
-          stats: { ...DEFAULT_STATE.stats, ...parsed.stats }
+          stats: { ...DEFAULT_STATE.stats, ...parsed.stats },
+          eventsClaimed: { ...DEFAULT_STATE.eventsClaimed, ...parsed.eventsClaimed }
         };
       } catch (e) {
         console.warn('Estado corrupto, usando default', e);

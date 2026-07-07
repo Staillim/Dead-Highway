@@ -26,6 +26,7 @@ import { RunHUD } from '../ui-hud/RunHUD.js';
 import { PlayerState } from '../save/PlayerState.js';
 import { computeUpgradeStats } from '../save/UpgradeStats.js';
 import { awardRunRewards } from '../save/Rewards.js';
+import { applyRunToMissions } from '../save/Missions.js';
 
 const DEBUG = new URLSearchParams(location.search).has('debug');
 
@@ -129,6 +130,7 @@ export class RunScene {
         this.controller.refuel(GAMEPLAY.fuel.canRefill);
         this.speedFx.burst(x, z, 6);
         this.chaseCamera.addImpulse(0.25);
+        this.runGas = (this.runGas || 0) + 1;   // para misiones (bidones)
       }
     });
     await this.pickups.load();
@@ -169,7 +171,8 @@ export class RunScene {
     this.zombies = new ZombieSystem(this.scene, {
       onKill: (z, gibbed) => this.gibs.burst(z.x, 0.8, z.z, z.cfg.tint, gibbed ? 8 : 5),
       onFatExplode: (x, z, cfg) => this.onFatExplode(x, z, cfg),
-      onReachCar: (z) => this.tryLatch(z)
+      onReachCar: (z) => this.tryLatch(z),
+      onDeath: (z) => { this.runKills = (this.runKills || 0) + 1; if (z.type === 'fat') this.runFatKills = (this.runFatKills || 0) + 1; }
     });
     await this.zombies.load();
     this.turret = new TurretSystem(this.scene, this.vehicle, this.zombies, {
@@ -263,6 +266,7 @@ export class RunScene {
     this.applyUpgrades(); // reaplicar mejoras (pudieron cambiar en el garaje)
     if (this.state.equipped?.turretColor) this.turret.applyColor(this.state.equipped.turretColor);
     this._ended = false;
+    this.runKills = 0; this.runFatKills = 0; this.runGas = 0; // contadores de misiones
     this.vehicle.reset();
 
     if (equipped && equipped.carId !== this.vehicle.equippedCarId) {
@@ -421,11 +425,21 @@ export class RunScene {
     this._ended = true;
     // Persistir progreso de la corrida en el estado del jugador
     const dist = Math.round(this.controller.distance);
-    const stats = this.state.stats || { bestDistance: 0, lastDistance: 0, runsPlayed: 0 };
+    const kills = this.runKills || 0;
+    const fatKills = this.runFatKills || 0;
+    const gas = this.runGas || 0;
+    const stats = this.state.stats || {};
     stats.lastDistance = dist;
-    stats.bestDistance = Math.max(stats.bestDistance, dist);
-    stats.runsPlayed += 1;
+    stats.bestDistance = Math.max(stats.bestDistance || 0, dist);
+    stats.runsPlayed = (stats.runsPlayed || 0) + 1;
+    // Acumulados (misiones/eventos): kills, gordos, distancia total, bidones
+    stats.totalKills = (stats.totalKills || 0) + kills;
+    stats.fatKills = (stats.fatKills || 0) + fatKills;
+    stats.totalDistance = (stats.totalDistance || 0) + dist;
+    stats.gasCollected = (stats.gasCollected || 0) + gas;
     this.state.stats = stats;
+    // Progreso de misiones diarias con el resultado de esta carrera
+    applyRunToMissions(this.state, { kills, fatKills, distance: dist, gas });
     // Recompensas: monedas, gemas y XP de pase de batalla
     this.lastRewards = awardRunRewards(this.state, dist);
     PlayerState.save(this.state);
