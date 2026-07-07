@@ -1661,6 +1661,7 @@ async function loadZombie() {
     state.zombieModel.scale.setScalar(normScale);
     const box2 = new THREE.Box3().setFromObject(state.zombieModel);
     state.zombieModel.position.set(0, -box2.min.y, 0);
+    state.zombiePlantY = state.zombieModel.position.y;   // altura base (para el reset de la muerte)
 
     document.getElementById('z-scale').value = state.zombieConfig.scale || 1;
     document.getElementById('z-intensity').value = state.zombieConfig.walk?.intensity ?? (ztype === 'runner' ? 1 : ztype === 'fat' ? 0.2 : 0.5);
@@ -1877,7 +1878,8 @@ function startAnimPreview(mode) {
 
 // Detiene la reproducción de clips FBX y restaura la pose base/postura editable
 function stopClipPreview() {
-  const wasPlaying = clipPlaying;
+  const wasPlaying = clipPlaying || deathAnim || deathToppled;
+  stopDeath();                       // resetear el volteo de la muerte procedural
   if (clipMixer) clipMixer.stopAllAction();
   clipPlaying = null;
   applyCurrentPose();
@@ -1895,6 +1897,7 @@ function playClip(name) {
     return;
   }
   stopAnimPreview();          // cortar el preview procedural
+  stopDeath();                // cortar el volteo de muerte si estaba activo
   clipMixer.stopAllAction();
   const once = (name === 'death' || name === 'scream');
   const a = clipActions[name];
@@ -1905,6 +1908,44 @@ function playClip(name) {
   clipPlaying = name;
   clipClock.getDelta();       // descartar dt acumulado mientras estaba parado
   if (st) { st.textContent = `▶ ${name}`; st.className = 'save-status info'; }
+}
+
+// Muerte PROCEDURAL: replica el desplome del juego (el clip FBX de muerte se
+// descartó porque distorsiona el rig). Voltea el modelo al suelo con easing.
+let deathAnim = null;
+let deathToppled = false;   // el modelo quedó tumbado (aunque la anim ya terminó)
+function stopDeath() {
+  if (deathAnim) { cancelAnimationFrame(deathAnim); deathAnim = null; }
+  deathToppled = false;
+  if (state.zombieModel) {
+    state.zombieModel.rotation.x = 0;
+    state.zombieModel.rotation.z = 0;
+    if (state.zombiePlantY != null) state.zombieModel.position.y = state.zombiePlantY;
+  }
+}
+
+function playProceduralDeath() {
+  if (!state.zombieModel) return;
+  stopClipPreview();
+  stopAnimPreview();
+  const model = state.zombieModel;
+  const baseY = state.zombiePlantY != null ? state.zombiePlantY : model.position.y;
+  const dir = Math.random() < 0.5 ? 1 : -1;
+  const yaw = (Math.random() - 0.5) * 0.5;
+  const t0 = performance.now();
+  function tick(now) {
+    const t = Math.min(1, (now - t0) / 420);   // ~0.42s, igual que el juego
+    const e = 1 - Math.pow(1 - t, 3);           // easeOutCubic (peso)
+    model.rotation.x = dir * e * 1.45;          // se acuesta ~83°
+    model.rotation.z = yaw * e;
+    model.position.y = baseY - 0.12 * e;
+    syncSkeletonJoints();
+    deathAnim = t < 1 ? requestAnimationFrame(tick) : null;
+  }
+  deathToppled = true;
+  deathAnim = requestAnimationFrame(tick);
+  const st = document.getElementById('z-save-status');
+  if (st) { st.textContent = '▶ death (procedural, como el juego)'; st.className = 'save-status info'; }
 }
 
 function saveZombie() {
@@ -1959,11 +2000,14 @@ if (zWalkBtn) zWalkBtn.addEventListener('click', () => startAnimPreview('walk'))
 const zGrabBtn = document.getElementById('z-pose-grab');
 if (zGrabBtn) zGrabBtn.addEventListener('click', () => startAnimPreview('grab'));
 
-// Clips FBX (Mixamo): previsualizar cada animación sobre el zombi cargado
-for (const clip of ['scream', 'crawl', 'biting', 'death']) {
+// Clips FBX (Mixamo): previsualizar cada animación sobre el zombi cargado.
+// La muerte usa el desplome PROCEDURAL (igual que el juego), no el clip FBX.
+for (const clip of ['scream', 'crawl', 'biting']) {
   const btn = document.getElementById(`z-clip-${clip}`);
   if (btn) btn.addEventListener('click', () => playClip(clip));
 }
+const zClipDeath = document.getElementById('z-clip-death');
+if (zClipDeath) zClipDeath.addEventListener('click', playProceduralDeath);
 const zClipStop = document.getElementById('z-clip-stop');
 if (zClipStop) zClipStop.addEventListener('click', stopClipPreview);
 
