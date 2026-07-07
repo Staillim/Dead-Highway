@@ -180,7 +180,7 @@ export class RunScene {
       onKill: (z, gibbed) => this.gibs.burst(z.x, 0.8, z.z, z.cfg.tint, gibbed ? 8 : 5),
       onFatExplode: (x, z, cfg) => this.onFatExplode(x, z, cfg),
       onReachCar: (z) => this.tryLatch(z),
-      onDeath: (z) => { this.runKills = (this.runKills || 0) + 1; if (z.type === 'fat') this.runFatKills = (this.runFatKills || 0) + 1; }
+      onDeath: (z) => this.registerKill(z)
     });
     await this.zombies.load();
     this.turret = new TurretSystem(this.scene, this.vehicle, this.zombies, {
@@ -277,6 +277,7 @@ export class RunScene {
     if (this.state.equipped?.turretColor) this.turret.applyColor(this.state.equipped.turretColor);
     this._ended = false;
     this.runKills = 0; this.runFatKills = 0; this.runGas = 0; // contadores de misiones
+    this.combo = 0; this.comboTimer = 0; this.score = 0; this.bestCombo = 0; // combo/score
     this.vehicle.reset();
 
     if (equipped && equipped.carId !== this.vehicle.equippedCarId) {
@@ -292,6 +293,19 @@ export class RunScene {
     this.controller.setPaused(v);
     if (v) { this.controller.setThrottle(0); this.hud.showPause(this.controller.snapshot()); }
     else this.hud.hidePause();
+  }
+
+  // Cada zombi muerto: suma kill + combo. Encadenar sube el multiplicador.
+  registerKill(z) {
+    this.runKills = (this.runKills || 0) + 1;
+    if (z.type === 'fat') this.runFatKills = (this.runFatKills || 0) + 1;
+    const c = GAMEPLAY.combo;
+    this.combo = (this.combo || 0) + 1;
+    this.comboTimer = c.windowS;
+    const mult = Math.min(c.maxMult, 1 + Math.floor(this.combo / c.killsPerTier));
+    this.score = (this.score || 0) + c.perKill * mult;
+    this.bestCombo = Math.max(this.bestCombo || 0, this.combo);
+    this.hud.setCombo(this.combo, mult, this.score);
   }
 
   // Golpe contra un obstáculo: pierde un corazón, sacude y frena; 0 → fin de run.
@@ -457,11 +471,18 @@ export class RunScene {
     stats.fatKills = (stats.fatKills || 0) + fatKills;
     stats.totalDistance = (stats.totalDistance || 0) + dist;
     stats.gasCollected = (stats.gasCollected || 0) + gas;
+    const score = Math.round(this.score || 0);
+    stats.lastScore = score;
+    stats.bestScore = Math.max(stats.bestScore || 0, score);
+    stats.bestCombo = Math.max(stats.bestCombo || 0, this.bestCombo || 0);
     this.state.stats = stats;
     // Progreso de misiones diarias con el resultado de esta carrera
     applyRunToMissions(this.state, { kills, fatKills, distance: dist, gas });
-    // Recompensas: monedas, gemas y XP de pase de batalla
+    // Recompensas: monedas, gemas y XP de pase de batalla + bono por score/combo
     this.lastRewards = awardRunRewards(this.state, dist);
+    const scoreCoins = Math.round(score * GAMEPLAY.combo.coinsPerScore);
+    if (scoreCoins > 0) { this.state.coins += scoreCoins; this.lastRewards.coins += scoreCoins; }
+    this.lastRewards.score = score;
     PlayerState.save(this.state);
     this.onExit?.();
   }
@@ -503,6 +524,11 @@ export class RunScene {
       this.tumbleweeds.update(dt, speed * dt);
       this.tumbleweeds.collide(this.laneSystem.x, (x, z) => this.speedFx.burst(x, z, 8));
       this.applyBiome();
+      // Combo: se rompe si dejás de matar durante la ventana
+      if (this.comboTimer > 0) {
+        this.comboTimer -= dt;
+        if (this.comboTimer <= 0 && this.combo > 0) { this.combo = 0; this.hud.setCombo(0, 1, this.score); }
+      }
       // Escudo: recarga una carga tras shieldRegenS segundos sin gastarlo
       if (this.shieldMax > 0 && this.shield < this.shieldMax) {
         this.shieldTimer -= dt;

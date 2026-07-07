@@ -30,6 +30,8 @@ export class RunHUD {
           <div class="run-chip" id="run-distance"><span id="run-distance-val">0 m</span><small>DISTANCIA</small></div>
           <div class="run-chip" id="run-speed">0 km/h</div>
         </div>
+        <div id="run-score"><b id="run-score-val">0</b><span>PUNTOS</span></div>
+        <div id="run-combo" hidden><b id="run-combo-mult">x2</b><span>COMBO</span></div>
         <div id="run-fuel" aria-label="Combustible">
           <svg class="fuel-ico" viewBox="0 0 24 24" fill="currentColor"><path d="M6 3h6a1 1 0 0 1 1 1v16H5V4a1 1 0 0 1 1-1zm1 2v4h4V5zm9.5 3.7L18 7.2v9.6a1.1 1.1 0 0 0 2.2 0V10a1.4 1.4 0 0 0-.5-1.1zM4 20h10v1.4H4z"/></svg>
           <div class="fuel-track"><div id="run-fuel-fill"></div></div>
@@ -60,6 +62,9 @@ export class RunHUD {
         hearts: this.root.querySelector('#run-hearts'),
         shield: this.root.querySelector('#run-shield'),
         shieldN: this.root.querySelector('#run-shield-n'),
+        score: this.root.querySelector('#run-score-val'),
+        combo: this.root.querySelector('#run-combo'),
+        comboMult: this.root.querySelector('#run-combo-mult'),
         dist: this.root.querySelector('#run-distance-val'),
         speed: this.root.querySelector('#run-speed'),
         fuel: this.root.querySelector('#run-fuel'),
@@ -111,6 +116,21 @@ export class RunHUD {
       this.el.hearts.classList.remove('hit');
       void this.el.hearts.offsetWidth;
       this.el.hearts.classList.add('hit');
+    }
+  }
+
+  // Combo/score: actualiza los puntos y el popup de multiplicador
+  setCombo(combo, mult, score) {
+    if (!this.el) return;
+    this.el.score.textContent = fmt(score);
+    if (combo >= 2 && mult >= 2) {
+      this.el.combo.hidden = false;
+      this.el.comboMult.textContent = `x${mult}`;
+      this.el.combo.classList.remove('pop');
+      void this.el.combo.offsetWidth;
+      this.el.combo.classList.add('pop');
+    } else if (combo === 0) {
+      this.el.combo.hidden = true;
     }
   }
 

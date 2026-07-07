@@ -190,6 +190,16 @@ export const GAMEPLAY = {
 
   hud: { textHz: 5 },
 
+  // Combo/score: matar zombis seguidos sube el multiplicador; si dejás de matar
+  // por `windowS` segundos, el combo se rompe. El score da monedas extra al final.
+  combo: {
+    windowS: 2.2,          // ventana para encadenar la próxima kill
+    perKill: 12,           // puntos base por kill (× multiplicador)
+    killsPerTier: 4,       // cada N kills sube el multiplicador (x1, x2, x3…)
+    maxMult: 8,
+    coinsPerScore: 0.04    // monedas extra = score × esto (al terminar)
+  },
+
   // Combustible: baja con el tiempo; los bidones lo recargan; 0 = fin de carrera
   fuel: {
     max: 100,
