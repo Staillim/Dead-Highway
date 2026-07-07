@@ -1,0 +1,248 @@
+{
+  "carId": "rugged_car_01",
+  "sockets": {
+    "turret": {
+      "position": [
+        0,
+        0.287,
+        -0.04
+      ],
+      "rotation": [
+        3.141592653589793,
+        -1.5184364492350666,
+        3.141592653589793
+      ],
+      "scale": 0.264
+    },
+    "hoodWeapon": {
+      "position": [
+        0,
+        0.226,
+        0.247
+      ],
+      "rotation": [
+        0,
+        0.017453292519943295,
+        0
+      ],
+      "scale": 0.111
+    },
+    "bumperAccessory": {
+      "position": [
+        -0.004,
+        0.049,
+        0.5
+      ],
+      "rotation": [
+        3.141592653589793,
+        -1.5533430342749532,
+        3.141592653589793
+      ],
+      "scale": 0.411
+    },
+    "doorArmor": {
+      "position": [
+        0.9,
+        0.5,
+        0
+      ],
+      "rotation": [
+        0,
+        90,
+        0
+      ],
+      "scale": 1
+    },
+    "spikes": {
+      "position": [
+        0,
+        0.4,
+        2.1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1
+    }
+  },
+  "overrides": {
+    "turret": {
+      "red_gun_turret_01": {
+        "position": [
+          0,
+          0.287,
+          -0.013
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": 0.344,
+        "muzzles": [
+          {
+            "position": [
+              0.0017,
+              0.3968,
+              0.4859
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "fireMode": "burst",
+            "burstCount": 3,
+            "burstInterval": 0.08
+          }
+        ]
+      },
+      "military+turret+3d+model": {
+        "position": [
+          0,
+          0.287,
+          -0.04
+        ],
+        "rotation": [
+          3.141592653589793,
+          -1.5184364492350666,
+          3.141592653589793
+        ],
+        "scale": 0.264,
+        "muzzles": [
+          {
+            "position": [
+              0.4809,
+              0.4098,
+              0.1018
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "fireMode": "burst",
+            "burstCount": 3,
+            "burstInterval": 0.08
+          },
+          {
+            "position": [
+              0.4509,
+              0.3929,
+              -0.0871
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "fireMode": "burst",
+            "burstCount": 3,
+            "burstInterval": 0.08
+          }
+        ]
+      },
+      "sci-fi+turret+3d+model": {
+        "position": [
+          0,
+          0.287,
+          -0.04
+        ],
+        "rotation": [
+          3.141592653589793,
+          -1.5184364492350666,
+          3.141592653589793
+        ],
+        "scale": 0.264,
+        "muzzles": [
+          {
+            "position": [
+              0.4924,
+              0.5152,
+              0.0854
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "fireMode": "single",
+            "burstCount": 3,
+            "burstInterval": 0.08
+          },
+          {
+            "position": [
+              0.48876788953405575,
+              0.5195487182848464,
+              -0.09575568205096673
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "fireMode": "single",
+            "burstCount": 3,
+            "burstInterval": 0.08
+          }
+        ]
+      }
+    },
+    "hoodWeapon": {
+      "heavy+weapon+turret+3d+model": {
+        "position": [
+          -0.0004412044534290206,
+          0.2263916922811055,
+          0.24677380692984277
+        ],
+        "rotation": [
+          -4.978956550532787e-18,
+          0.017489579284894415,
+          2.449152114784588e-16
+        ],
+        "scale": 0.111,
+        "muzzles": [
+          {
+            "position": [
+              -0.006241670064931948,
+              0.4894283246724541,
+              0.47684298280767723
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "fireMode": "single",
+            "burstCount": 3,
+            "burstInterval": 0.08
+          }
+        ]
+      }
+    }
+  },
+  "compatibility": {
+    "turret": {
+      "hidden": [],
+      "exclusive": []
+    },
+    "hoodWeapon": {
+      "hidden": [],
+      "exclusive": []
+    },
+    "bumperAccessory": {
+      "hidden": [],
+      "exclusive": []
+    },
+    "doorArmor": {
+      "hidden": [],
+      "exclusive": []
+    },
+    "spikes": {
+      "hidden": [],
+      "exclusive": []
+    }
+  }
+}

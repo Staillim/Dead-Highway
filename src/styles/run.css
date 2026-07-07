@@ -1,0 +1,177 @@
+/* ============================================================
+   Dead Highway — HUD de partida (modo run)
+   Reutiliza los design tokens de lobby.css (:root compartido).
+   ============================================================ */
+
+/* ---------- Barra superior ---------- */
+
+#run-hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) 12px 8px;
+  pointer-events: none;
+}
+
+#run-hud > * {
+  pointer-events: auto;
+}
+
+#run-pause-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+#run-pause-btn svg {
+  width: 16px;
+  height: 16px;
+  color: #e6e8ec;
+}
+
+.run-chip {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 7px 14px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  text-align: center;
+}
+
+#run-distance {
+  font-size: 17px;
+  min-width: 110px;
+}
+
+#run-distance small {
+  display: block;
+  font-size: 8.5px;
+  font-weight: 800;
+  color: var(--txt-dim);
+  letter-spacing: 1px;
+}
+
+#run-speed {
+  font-size: 13px;
+  color: var(--gold);
+  min-width: 84px;
+}
+
+#run-hearts {
+  color: #ff5a4e;
+  font-size: 13px;
+  letter-spacing: 1px;
+  padding: 7px 10px;
+}
+
+#run-hearts .lost {
+  color: rgba(255, 255, 255, 0.18);
+}
+
+#run-hearts.hit {
+  animation: hearts-hit 0.4s ease;
+}
+
+@keyframes hearts-hit {
+  0%, 100% { transform: scale(1); }
+  30% { transform: scale(1.25); }
+  60% { transform: scale(0.92); }
+}
+
+/* ---------- Overlay de pausa ---------- */
+
+#run-pause {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+}
+
+#run-pause[hidden] {
+  display: none;
+}
+
+.pause-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 5, 8, 0.66);
+}
+
+.pause-card {
+  position: relative;
+  width: min(84%, 320px);
+  background: #14161d;
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: pause-in 0.22s ease;
+}
+
+@keyframes pause-in {
+  from {
+    transform: translateY(14px) scale(0.97);
+    opacity: 0;
+  }
+}
+
+.pause-card h2 {
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.pause-stat {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  padding: 7px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.pause-stat b {
+  color: var(--gold);
+}
+
+.pause-card .btn-resume {
+  background: linear-gradient(180deg, var(--gold-hi), var(--gold));
+  border: 1.5px solid #ffe58c;
+  color: #201802;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  padding: 12px;
+}
+
+.pause-card .btn-exit {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--panel-border);
+  color: #e6e8ec;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  padding: 10px;
+}
+
+.pause-card button:active {
+  transform: scale(0.97);
+}

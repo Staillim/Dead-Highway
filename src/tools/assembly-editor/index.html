@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dead Highway — Modo Dev (Assembly Editor)</title>
+  <style>
+    :root {
+      --bg: #0f1116;
+      --panel: #181b22;
+      --panel-2: #12141a;
+      --border: #2a2f3a;
+      --txt: #e8eaee;
+      --txt-dim: #8b909b;
+      --blue: #3b82f6;
+      --green: #35c651;
+      --gold: #f5b301;
+      --red: #ef4444;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      background: var(--bg); color: var(--txt);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+
+    #app { display: flex; width: 100%; height: 100%; }
+
+    #sidebar {
+      width: 340px;
+      min-width: 340px;
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: #333 transparent;
+    }
+
+    #sidebar h1 {
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel-2);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #sidebar h1 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 8px var(--gold); }
+
+    .section { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+    .section > label {
+      display: block; font-size: 11px; color: var(--txt-dim);
+      margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700;
+    }
+
+    select, input[type="number"], input[type="text"], textarea {
+      width: 100%; padding: 9px;
+      border: 1px solid var(--border); border-radius: 7px;
+      background: var(--panel-2); color: var(--txt); font-size: 13px;
+    }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--blue); }
+
+    button {
+      width: 100%; padding: 9px;
+      border: 1px solid var(--blue); border-radius: 7px;
+      background: var(--blue); color: #fff;
+      font-size: 13px; font-weight: 700; cursor: pointer;
+      margin-top: 8px; transition: filter 0.12s, transform 0.08s;
+    }
+    button:hover { filter: brightness(1.1); }
+    button:active { transform: scale(0.98); }
+    button.secondary { background: #262b34; border-color: var(--border); color: var(--txt); }
+    button.danger { background: transparent; border-color: var(--red); color: #ff9a9a; }
+
+    /* Botón grande de guardado */
+    button.save-main {
+      background: linear-gradient(180deg, #46d95f, #26a63e);
+      border-color: #6fe884; color: #06280d;
+      font-size: 15px; font-weight: 900; letter-spacing: 0.5px;
+      padding: 13px; margin-top: 12px;
+      box-shadow: 0 4px 16px rgba(53, 198, 81, 0.3);
+    }
+
+    .save-status {
+      margin-top: 8px; font-size: 12px; font-weight: 600;
+      padding: 7px 10px; border-radius: 7px; text-align: center;
+      background: var(--panel-2); border: 1px solid var(--border); color: var(--txt-dim);
+    }
+    .save-status.ok { color: #6fe884; border-color: rgba(53,198,81,0.4); background: rgba(53,198,81,0.08); }
+    .save-status.err { color: #ff9a9a; border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.08); }
+    .save-status.dirty { color: var(--gold); border-color: rgba(245,179,1,0.35); background: rgba(245,179,1,0.07); }
+    .save-status.info { color: #9fc0ff; }
+
+    .btn-row { display: flex; gap: 8px; }
+    .btn-row button { margin-top: 8px; }
+
+    #tabs { display: flex; flex-wrap: wrap; gap: 5px; }
+    .tab {
+      flex: 1; min-width: 64px; padding: 8px 4px; text-align: center;
+      background: var(--panel-2); border: 1px solid var(--border); border-radius: 7px;
+      cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.12s;
+    }
+    .tab:hover { border-color: #3a4150; }
+    .tab.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+    #asset-list { display: flex; flex-direction: column; gap: 6px; max-height: 210px; overflow-y: auto; }
+    .asset-item {
+      display: flex; justify-content: space-between; align-items: center; gap: 6px;
+      padding: 8px 9px; background: var(--panel-2); border: 1px solid var(--border);
+      border-radius: 7px; cursor: pointer; font-size: 13px; transition: all 0.12s;
+    }
+    .asset-item:hover { border-color: #3a4150; }
+    .asset-item.active { border-color: var(--blue); background: #16233c; color: #cfe0ff; }
+    .asset-item.hidden-item { opacity: 0.4; }
+    .asset-item.hidden-item .asset-name { text-decoration: line-through; }
+    .asset-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .asset-toggles { display: flex; gap: 3px; flex-shrink: 0; }
+    .tg-btn {
+      width: 26px; height: 26px; padding: 0; margin: 0;
+      border: 1px solid var(--border); border-radius: 5px;
+      background: var(--panel-2); color: var(--txt-dim);
+      font-size: 13px; cursor: pointer; display: flex;
+      align-items: center; justify-content: center; line-height: 1;
+      transition: all 0.12s; flex-shrink: 0;
+    }
+    .tg-btn:hover { border-color: #5a606e; color: var(--txt); }
+    .tg-btn.override-on { background: rgba(59,130,246,0.2); border-color: var(--blue); color: var(--blue); }
+    .tg-btn.vis-off { opacity: 0.25; }
+    .tg-btn.excl-on { background: rgba(245,179,1,0.2); border-color: var(--gold); color: var(--gold); }
+
+    .muzzle-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 8px; background: var(--panel-2); border: 1px solid var(--border);
+      border-radius: 6px; cursor: pointer; font-size: 12px; margin-bottom: 4px;
+      transition: all 0.12s;
+    }
+    .muzzle-item:hover { border-color: #3a4150; }
+    .muzzle-item.active { border-color: var(--blue); background: #16233c; }
+    .muzzle-dot { width: 10px; height: 10px; border-radius: 50%; background: #ff8c2a; box-shadow: 0 0 6px #ff8c2a; flex-shrink: 0; }
+    .muzzle-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .muzzle-mode { font-size: 10px; color: var(--txt-dim); flex-shrink: 0; }
+
+    #socket-controls { display: flex; flex-direction: column; gap: 7px; }
+    .field { display: flex; align-items: center; gap: 8px; }
+    .field label { width: 54px; font-size: 12px; color: var(--txt-dim); margin: 0; font-weight: 600; }
+    .field input { flex: 1; padding: 7px 9px; }
+
+    #gizmo-modes { display: flex; gap: 6px; }
+    .mode-btn { flex: 1; margin-top: 0; }
+    .mode-btn.secondary.active, .mode-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+    #scale-presets { display: flex; gap: 6px; margin-bottom: 4px; }
+    .scale-btn { flex: 1; margin-top: 0; font-size: 12px; padding: 7px 4px; }
+
+    #accessory-dims { font-size: 11px; color: var(--txt-dim); margin-top: 8px; font-family: monospace; }
+
+    #json-output { min-height: 110px; font-family: monospace; font-size: 11px; resize: vertical; margin-top: 4px; }
+
+    #validation-log {
+      max-height: 120px; overflow-y: auto; font-size: 11px;
+      background: var(--panel-2); padding: 9px; border-radius: 7px; line-height: 1.6;
+    }
+    .log-ok { color: #6fe884; }
+    .log-warn { color: var(--gold); }
+    .log-error { color: #ff9a9a; }
+
+    #viewport { flex: 1; position: relative; background: radial-gradient(circle at 50% 40%, #1c2028, #0d0f13); }
+    #viewport canvas { display: block; }
+
+    #viewport-hint {
+      position: absolute; bottom: 12px; left: 12px;
+      background: rgba(0,0,0,0.6); padding: 8px 12px; border-radius: 7px;
+      font-size: 12px; color: var(--txt-dim); pointer-events: none;
+    }
+
+    .hint-small { font-size: 11px; color: var(--txt-dim); margin: 6px 0 0; line-height: 1.5; }
+
+    .sg-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+    .sg-item {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 4px; padding: 3px 7px; background: var(--panel-2);
+      border: 1px solid var(--border); border-radius: 5px; font-size: 11px;
+    }
+    .sg-item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--txt-dim); }
+    .sg-item-rm { width: 18px; height: 18px; padding: 0; margin: 0; border: none; background: transparent; color: var(--red); cursor: pointer; font-size: 14px; line-height: 1; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .sg-item-rm:hover { color: #ff6b6b; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar">
+      <h1><span class="dot"></span> Dead Highway — Modo Dev</h1>
+
+      <div class="section">
+        <label>Padre (carro)</label>
+        <select id="car-select"></select>
+        <div class="btn-row">
+          <button id="load-lobby-car" type="button">🚗 Carro del lobby</button>
+          <button id="reload-cars" class="secondary" type="button">↻ Recargar</button>
+        </div>
+        <p class="hint-small">El selector lista <strong>todos</strong> los carros de <code>cars/processed/</code>. Elegí cualquiera para editar sus sockets.</p>
+
+        <div class="field" style="margin-top:8px;">
+          <label>Rot Y</label>
+          <input type="number" step="1" id="car-ry" value="0" style="width:80px;" />
+          <button id="car-rot-reset" class="secondary" type="button" style="width:auto;margin-top:0;display:inline;margin-left:4px;">↺</button>
+        </div>
+        <p class="hint-small">Rotación Y del carro en grados. Ajustá si el modelo no apunta hacia +Z correctamente.</p>
+      </div>
+
+      <div class="section">
+        <label>Categoría de accesorio</label>
+        <div id="tabs"></div>
+      </div>
+
+      <div class="section">
+        <label>Accesorio de referencia</label>
+        <div id="asset-list"></div>
+      </div>
+
+      <div class="section">
+        <label>Modo del gizmo (T / R / S)</label>
+        <div id="gizmo-modes">
+          <button id="mode-translate" class="mode-btn active" type="button">Mover</button>
+          <button id="mode-rotate" class="mode-btn secondary" type="button">Rotar</button>
+          <button id="mode-scale" class="mode-btn secondary" type="button">Escalar</button>
+        </div>
+      </div>
+
+      <div class="section" id="mesh-group-section">
+        <label>Grupos de Mallas (qué gira)</label>
+        <div class="btn-row">
+          <button id="sg-wheels" class="secondary sg-btn" type="button">🔘 Ruedas</button>
+        </div>
+        <div class="btn-row" style="margin-top:6px;">
+          <button id="sg-turret" class="secondary sg-btn" type="button">🎯 Base Torreta</button>
+          <button id="sg-hood" class="secondary sg-btn" type="button">🔫 Base Capó</button>
+        </div>
+        <div id="sg-status" class="hint-small" style="margin:8px 0 4px;">Seleccioná un grupo y posicioná el cilindro.</div>
+        <div class="btn-row" id="sg-actions" style="display:none;">
+          <button id="sg-add" type="button">✓ Añadir esta rueda</button>
+          <button id="sg-done" class="secondary" type="button">Terminar</button>
+        </div>
+        <div id="sg-list" style="max-height:140px; overflow-y:auto; font-size:11px; margin-top:6px; display:flex; flex-direction:column; gap:3px;"></div>
+      </div>
+
+      <div class="section">
+        <label>Posición / Rotación / Escala</label>
+        <div id="socket-controls">
+          <div class="field"><label>Pos X</label><input type="number" step="0.01" data-axis="px" /></div>
+          <div class="field"><label>Pos Y</label><input type="number" step="0.01" data-axis="py" /></div>
+          <div class="field"><label>Pos Z</label><input type="number" step="0.01" data-axis="pz" /></div>
+          <div class="field"><label>Rot X</label><input type="number" step="1" data-axis="rx" /></div>
+          <div class="field"><label>Rot Y</label><input type="number" step="1" data-axis="ry" /></div>
+          <div class="field"><label>Rot Z</label><input type="number" step="1" data-axis="rz" /></div>
+          <div class="field"><label>Escala</label><input type="number" step="0.001" data-axis="scale" value="1" /></div>
+        </div>
+
+        <label style="margin-top: 12px;">Ajuste rápido de escala</label>
+        <div id="scale-presets">
+          <button class="scale-btn secondary" data-factor="0.01" type="button">×0.01</button>
+          <button class="scale-btn secondary" data-factor="0.1" type="button">×0.1</button>
+          <button class="scale-btn secondary" data-factor="0.5" type="button">×0.5</button>
+          <button class="scale-btn secondary" data-factor="1" type="button">×1</button>
+        </div>
+        <button id="auto-scale" class="secondary" type="button">Auto-escalar al carro</button>
+        <div id="accessory-dims"></div>
+
+        <div id="muzzles-section" style="display:none; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border);">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: 8px;">
+            <label style="margin:0;">Puntos de disparo (muzzles)</label>
+            <span id="muzzle-count" style="font-size:11px; color:var(--txt-dim);">0</span>
+          </div>
+          <div id="muzzle-list"></div>
+          <div class="btn-row" style="margin-top:6px;">
+            <button id="add-muzzle" class="secondary" type="button" style="margin-top:4px;">+ Añadir punto</button>
+            <button id="remove-muzzle" class="danger" type="button" style="margin-top:4px;">🗑 Quitar</button>
+          </div>
+          <div id="muzzle-controls" style="display:none; flex-direction:column; gap:6px; margin-top:8px; padding:8px; background:var(--panel-2); border-radius:7px;">
+            <div class="field"><label>Pos X</label><input type="number" step="0.001" id="mx-px" /></div>
+            <div class="field"><label>Pos Y</label><input type="number" step="0.001" id="mx-py" /></div>
+            <div class="field"><label>Pos Z</label><input type="number" step="0.001" id="mx-pz" /></div>
+            <div class="field"><label>Rot X</label><input type="number" step="1" id="mx-rx" value="0" /></div>
+            <div class="field"><label>Rot Y</label><input type="number" step="1" id="mx-ry" value="0" /></div>
+            <div class="field"><label>Rot Z</label><input type="number" step="1" id="mx-rz" value="0" /></div>
+            <div class="field">
+              <label>Modo</label>
+              <select id="mx-firemode" style="flex:1;">
+                <option value="single">Disparo único</option>
+                <option value="burst">Ráfaga</option>
+              </select>
+            </div>
+            <div class="field" id="mx-burst-row" style="display:none;">
+              <label>Ráfaga</label>
+              <div style="display:flex; gap:6px; flex:1;">
+                <input type="number" step="1" id="mx-burst-count" value="3" min="2" max="10" style="flex:1;" title="Disparos por ráfaga" />
+                <input type="number" step="0.01" id="mx-burst-interval" value="0.08" min="0.02" max="0.5" style="flex:1;" title="Intervalo (s)" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button id="save-socket" class="save-main" type="button">💾 GUARDAR SOCKET</button>
+        <div id="save-status" class="save-status">Ajustá y pulsá Guardar para escribir el archivo.</div>
+        <button id="reset-socket" class="secondary" type="button">Restaurar por defecto</button>
+        <p class="hint-small">El auto-guardado mantiene tus cambios en el navegador; <strong>Guardar</strong> los escribe en <code>assets/sockets/{carro}.json</code>.</p>
+      </div>
+
+      <div class="section" id="zombie-section" style="display:none;">
+        <label>Editor de Zombies</label>
+        <select id="zombie-type">
+          <option value="normal">Normal</option>
+          <option value="runner">Runner</option>
+          <option value="fat">Fat / Gordo</option>
+        </select>
+        <div class="field" style="margin-top:8px;">
+          <label>Escala</label>
+          <input type="number" step="0.01" id="z-scale" value="1" />
+        </div>
+        <button id="load-zombie" class="secondary" type="button" style="margin-top:8px;">Cargar zombie</button>
+        <div style="margin-top:10px;">
+          <div style="display:flex; gap:6px;">
+            <div class="field" style="flex:1;"><label style="width:50px;">Int.</label><input type="range" min="0" max="1" step="0.01" id="z-intensity" value="0.5" /></div>
+            <span id="z-int-val" style="font-size:11px;color:var(--txt-dim);margin-top:5px;">0.5</span>
+          </div>
+          <div style="display:flex; gap:6px; margin-top:4px;">
+            <div class="field" style="flex:1;"><label style="width:50px;">Hunch</label><input type="range" min="0" max="1" step="0.01" id="z-hunch" value="0.6" /></div>
+            <span id="z-hunch-val" style="font-size:11px;color:var(--txt-dim);margin-top:5px;">0.6</span>
+          </div>
+        </div>
+        <div style="display:flex; gap:6px; margin-top:8px;">
+          <button id="z-pose-bind" class="secondary" type="button" style="margin-top:0;">Bind</button>
+          <button id="z-pose-walk" class="secondary" type="button" style="margin-top:0;">Walk</button>
+          <button id="z-pose-grab" class="secondary" type="button" style="margin-top:0;">Grab</button>
+        </div>
+        <label style="margin-top:12px;">Huesos</label>
+        <div id="z-bone-list" style="max-height:180px; overflow-y:auto; display:flex; flex-direction:column; gap:4px;"></div>
+        <div id="z-bone-controls" style="display:none; margin-top:8px; padding:8px; background:var(--panel-2); border-radius:7px;">
+          <div class="field"><label>Rot X</label><input type="number" step="0.01" id="z-bx" value="0" /></div>
+          <div class="field"><label>Rot Y</label><input type="number" step="0.01" id="z-by" value="0" /></div>
+          <div class="field"><label>Rot Z</label><input type="number" step="0.01" id="z-bz" value="0" /></div>
+        </div>
+        <button id="save-zombie" class="save-main" type="button" style="margin-top:12px;">💾 GUARDAR ZOMBIE</button>
+        <div id="z-save-status" class="save-status" style="margin-top:6px;">Cargá un zombie para editar.</div>
+      </div>
+
+      <div class="section">
+        <label>Validación del carro</label>
+        <div id="validation-log">Seleccioná un carro para validar.</div>
+      </div>
+
+      <div class="section">
+        <label>JSON del carro (todos los sockets)</label>
+        <textarea id="json-output" readonly></textarea>
+        <div class="btn-row">
+          <button id="download-json" class="secondary" type="button">⬇ Descargar</button>
+          <button id="load-json" class="secondary" type="button">Cargar desde texto</button>
+        </div>
+      </div>
+    </aside>
+
+    <main id="viewport">
+      <div id="viewport-hint">Click derecho: orbitar · Click izq. en gizmo: mover/rotar · T/R/S: cambiar modo</div>
+    </main>
+  </div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

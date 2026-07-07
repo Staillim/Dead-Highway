@@ -1,0 +1,37 @@
+{
+  "type": "runner",
+  "scale": 0.92,
+  "posture": {
+    "Spine01": { "rx": 0, "ry": 0, "rz": 0 },
+    "Spine02": { "rx": 0, "ry": 0, "rz": 0 },
+    "Waist": { "rx": 0, "ry": 0, "rz": 0 },
+    "Head": { "rx": 0, "ry": 0, "rz": 0 },
+    "L_Clavicle": { "rx": 0, "ry": 0, "rz": 0 },
+    "R_Clavicle": { "rx": 0, "ry": 0, "rz": 0 },
+    "L_Upperarm": { "rx": 0, "ry": 0, "rz": 0 },
+    "R_Upperarm": { "rx": 0, "ry": 0, "rz": 0 },
+    "L_Forearm": { "rx": 0, "ry": 0, "rz": 0 },
+    "R_Forearm": { "rx": 0, "ry": 0, "rz": 0 },
+    "L_Thigh": { "rx": 0, "ry": 0, "rz": 0 },
+    "R_Thigh": { "rx": 0, "ry": 0, "rz": 0 },
+    "L_Calf": { "rx": 0, "ry": 0, "rz": 0 },
+    "R_Calf": { "rx": 0, "ry": 0, "rz": 0 },
+    "Hip": { "rx": 0, "ry": 0, "rz": 0 },
+    "Pelvis": { "rx": 0, "ry": 0, "rz": 0 }
+  },
+  "walk": {
+    "intensity": 1.0,
+    "hunch": 0.6
+  },
+  "grab": {
+    "spine01X": 0.3,
+    "spine02X": 0.2,
+    "headX": -0.2,
+    "upperarmX": -1.7,
+    "forearmX": -0.15,
+    "thighX": 0.3,
+    "calfX": 0.5,
+    "legSpreadZ": 0.15,
+    "armZ": 0.1
+  }
+}
