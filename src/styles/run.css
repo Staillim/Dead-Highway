@@ -149,6 +149,47 @@
   50% { box-shadow: 0 0 12px rgba(255, 70, 55, 0.55); }
 }
 
+/* Pedal de aceleración: círculo dorado abajo-derecha (mantener = acelerar) */
+#run-gas {
+  position: absolute;
+  right: calc(env(safe-area-inset-right, 0px) + 16px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 34px);
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  z-index: 12;
+  display: grid;
+  place-items: center;
+  gap: 0;
+  background: radial-gradient(circle at 50% 34%, #ffd23d, #d98a00 78%);
+  border: 2px solid rgba(255, 226, 138, 0.75);
+  color: #2a1a04;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.42), inset 0 2px 5px rgba(255, 255, 255, 0.4);
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+
+#run-gas svg {
+  width: 26px;
+  height: 26px;
+  margin-bottom: -2px;
+}
+
+#run-gas span {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+}
+
+#run-gas.pressed {
+  transform: scale(0.9);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.42), 0 0 24px rgba(255, 190, 40, 0.75), inset 0 2px 5px rgba(255, 255, 255, 0.35);
+}
+
 #run-hearts .lost {
   color: rgba(255, 255, 255, 0.18);
 }

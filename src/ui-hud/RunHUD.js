@@ -10,11 +10,12 @@ const PAUSE_ICON =
 // HUD DOM de la partida: distancia + velocidad (throttled) y overlay de pausa.
 // DOM puro = 0 draw calls; reutiliza los tokens CSS del lobby.
 export class RunHUD {
-  constructor({ root, onPause, onResume, onExit }) {
+  constructor({ root, onPause, onResume, onExit, onThrottle }) {
     this.root = root;
     this.onPause = onPause;
     this.onResume = onResume;
     this.onExit = onExit;
+    this.onThrottle = onThrottle;
     this.acc = 0;
     this.mountedOnce = false;
   }
@@ -32,6 +33,10 @@ export class RunHUD {
           <svg class="fuel-ico" viewBox="0 0 24 24" fill="currentColor"><path d="M6 3h6a1 1 0 0 1 1 1v16H5V4a1 1 0 0 1 1-1zm1 2v4h4V5zm9.5 3.7L18 7.2v9.6a1.1 1.1 0 0 0 2.2 0V10a1.4 1.4 0 0 0-.5-1.1zM4 20h10v1.4H4z"/></svg>
           <div class="fuel-track"><div id="run-fuel-fill"></div></div>
         </div>
+        <button id="run-gas" aria-label="Acelerar">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l6 7h-4v4h-4v-4H6zM6 17h12v3H6z"/></svg>
+          <span>GAS</span>
+        </button>
         <div id="run-pause" hidden>
           <div class="pause-backdrop" data-action="resume"></div>
           <div class="pause-card">
@@ -60,6 +65,17 @@ export class RunHUD {
         pauseDist: this.root.querySelector('#pause-distance'),
         pauseBest: this.root.querySelector('#pause-best')
       };
+
+      // Pedal de aceleración: mantener presionado = acelerar (pointer = touch+mouse)
+      const gas = this.root.querySelector('#run-gas');
+      if (gas) {
+        const setThrottle = (v) => { this.onThrottle?.(v); gas.classList.toggle('pressed', v > 0); };
+        gas.addEventListener('pointerdown', (e) => { e.preventDefault(); gas.setPointerCapture?.(e.pointerId); setThrottle(1); });
+        gas.addEventListener('pointerup', () => setThrottle(0));
+        gas.addEventListener('pointercancel', () => setThrottle(0));
+        gas.addEventListener('lostpointercapture', () => setThrottle(0));
+      }
+
       this.mountedOnce = true;
     }
     this.hidePause();

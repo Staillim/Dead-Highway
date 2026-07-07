@@ -204,7 +204,8 @@ export class RunScene {
       root: document.getElementById('run-ui-root'),
       onPause: () => this.setPaused(true),
       onResume: () => this.setPaused(false),
-      onExit: () => this.endRun()
+      onExit: () => this.endRun(),
+      onThrottle: (v) => { if (!this.controller.paused) this.controller.setThrottle(v); }
     });
 
     // Auto-pausa al ocultar la pestaña/app
@@ -280,7 +281,7 @@ export class RunScene {
 
   setPaused(v) {
     this.controller.setPaused(v);
-    if (v) this.hud.showPause(this.controller.snapshot());
+    if (v) { this.controller.setThrottle(0); this.hud.showPause(this.controller.snapshot()); }
     else this.hud.hidePause();
   }
 

@@ -16,7 +16,13 @@ export class RunController {
     this.slow = 1; // factor de ralentización por impacto (recupera solo)
     this.fuel = GAMEPLAY.fuel.max;
     this.outOfFuel = false;
+    this.throttle = 0; // acelerador del jugador (0..1), lo fija el pedal del HUD
     this.speedMul = this.speedMul || 1; // bono de motor (mejoras)
+  }
+
+  // Pedal de aceleración (0 = crucero, 1 = a fondo)
+  setThrottle(v) {
+    this.throttle = Math.max(0, Math.min(1, v || 0));
   }
 
   // Golpe contra un obstáculo: frena y recupera en slowRecoverS segundos
@@ -30,15 +36,27 @@ export class RunController {
 
   update(dt) {
     if (this.paused || this.ended) return;
-    const { base, max, gainPerMeter } = GAMEPLAY.speed;
+    const { base, max, gainPerMeter, boostMul } = GAMEPLAY.speed;
+    const thr = this.throttle || 0;
     this.slow = Math.min(1, this.slow + dt / GAMEPLAY.obstacles.slowRecoverS);
 
-    // Combustible: baja constante; a 0 el carro se detiene → fin de carrera
-    this.fuel = Math.max(0, this.fuel - GAMEPLAY.fuel.drainPerSec * dt);
+    // Combustible: baja constante; acelerar a fondo lo consume más rápido
+    this.fuel = Math.max(0, this.fuel - GAMEPLAY.fuel.drainPerSec * (1 + thr * 0.8) * dt);
     if (this.fuel <= 0) this.outOfFuel = true;
 
-    const target = Math.min(max * this.speedMul, base + this.distance * gainPerMeter) * this.slow * this.speedMul;
-    this.speed = this.outOfFuel ? Math.max(0, this.speed - 30 * dt) : target; // se frena sin gas
+    // Crucero automático (sube con la distancia) + boost al pisar el pedal.
+    // El boost es un surge relativo al crucero (~+60%), con techo absoluto, para
+    // que se sienta al acelerar sin triplicar la velocidad al principio.
+    const cruise = Math.min(max, base + this.distance * gainPerMeter) * this.speedMul;
+    const boost = Math.min(max * this.speedMul * (boostMul || 1.35), cruise * 1.6);
+    const desired = (cruise + (boost - cruise) * thr) * this.slow;
+
+    if (this.outOfFuel) {
+      this.speed = Math.max(0, this.speed - 30 * dt); // sin gas: se detiene
+    } else {
+      // el motor sube/baja de a poco (sensación de aceleración)
+      this.speed += (desired - this.speed) * Math.min(1, 2.5 * dt);
+    }
     this.distance += this.speed * dt;
   }
 
