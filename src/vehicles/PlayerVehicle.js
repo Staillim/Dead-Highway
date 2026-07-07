@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GAMEPLAY } from '../config/gameplay.js';
 import { loadEquipped } from './EquippedLoader.js';
 import { createContactShadow } from '../vfx/ContactShadowFactory.js';
-import { normalizeModel } from '../utils/measure.js';
+import { normalizeModel, measureModel } from '../utils/measure.js';
 
 function extractMuzzles(socketData, equipped, type) {
   if (!socketData?.overrides) return [];
@@ -50,24 +50,24 @@ function findWheels(carModel) {
     }
   });
   if (wheels.length === 0) {
-    const candidates = [];
-    const box = new THREE.Box3().setFromObject(carModel);
+    // Heurística robusta: las 4 mallas más grandes en el 25% inferior del carro.
+    // measureModel evita el bbox erróneo de setFromObject en GLB de IA.
+    const box = measureModel(carModel);
     const size = box.getSize(new THREE.Vector3());
     const minY = box.min.y;
+    const candidates = [];
     carModel.traverse((child) => {
       if (!child.isMesh) return;
-      const cb = new THREE.Box3().setFromObject(child);
-      const cy = cb.getCenter(new THREE.Vector3()).y;
-      if (cy < minY + size.y * 0.2) {
-        const s = cb.getSize(new THREE.Vector3());
-        const vol = s.x * s.y * s.z;
-        candidates.push({ obj: child, vol });
+      const cb = measureModel(child, carModel);
+      const c = cb.getCenter(new THREE.Vector3());
+      const s = cb.getSize(new THREE.Vector3());
+      // rueda ≈ objeto bajo, con dos dimensiones parecidas (redondo)
+      if (c.y < minY + size.y * 0.28) {
+        candidates.push({ obj: child, vol: s.x * s.y * s.z });
       }
     });
     candidates.sort((a, b) => b.vol - a.vol);
-    for (const c of candidates.slice(0, 4)) {
-      wheels.push(c.obj);
-    }
+    for (const c of candidates.slice(0, 4)) wheels.push(c.obj);
   }
   console.log(`[PlayerVehicle] Ruedas detectadas: ${wheels.length}`, wheels.map(w => w.name || w.type));
   return wheels;
