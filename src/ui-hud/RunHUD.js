@@ -28,6 +28,7 @@ export class RunHUD {
           <div class="run-chip" id="run-distance"><span id="run-distance-val">0 m</span><small>DISTANCIA</small></div>
           <div class="run-chip" id="run-speed">0 km/h</div>
         </div>
+        <div id="run-fuel"><div id="run-fuel-fill"></div><span id="run-fuel-icon">⛽</span></div>
         <div id="run-pause" hidden>
           <div class="pause-backdrop" data-action="resume"></div>
           <div class="pause-card">
@@ -50,6 +51,7 @@ export class RunHUD {
         hearts: this.root.querySelector('#run-hearts'),
         dist: this.root.querySelector('#run-distance-val'),
         speed: this.root.querySelector('#run-speed'),
+        fuelFill: this.root.querySelector('#run-fuel-fill'),
         pause: this.root.querySelector('#run-pause'),
         pauseDist: this.root.querySelector('#pause-distance'),
         pauseBest: this.root.querySelector('#pause-best')
@@ -60,6 +62,11 @@ export class RunHUD {
   }
 
   update(snapshot) {
+    // La barra de gasolina sí se actualiza cada frame (suave)
+    if (this.el && snapshot.fuelPct != null) {
+      this.el.fuelFill.style.width = `${snapshot.fuelPct}%`;
+      this.el.fuelFill.style.background = snapshot.fuelPct < 25 ? '#e6392e' : '#57c84d';
+    }
     // Texto a ~5 Hz: el DOM no necesita 60 fps
     this.acc += 1;
     if (this.acc < 60 / GAMEPLAY.hud.textHz) return;

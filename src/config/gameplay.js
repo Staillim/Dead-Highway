@@ -166,6 +166,15 @@ export const GAMEPLAY = {
 
   hud: { textHz: 5 },
 
+  // Combustible: baja con el tiempo; los bidones lo recargan; 0 = fin de carrera
+  fuel: {
+    max: 100,
+    drainPerSec: 3.2,      // ~31s por tanque si no recogés nada
+    canRefill: 34,         // cuánto recarga un bidón
+    spawnEveryS: [5, 9],   // intervalo entre bidones
+    scale: 1.1             // tamaño del bidón (m)
+  },
+
   budget: { maxDrawCalls: 150, dprMax: 2 }
 };
 

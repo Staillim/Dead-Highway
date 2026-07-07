@@ -15,6 +15,7 @@ import { AmbientEvents } from '../environment/AmbientEvents.js';
 import { Tumbleweeds } from '../environment/Tumbleweeds.js';
 import { ObstacleSystem } from '../obstacles/ObstacleSystem.js';
 import { TrafficSystem } from '../traffic/TrafficSystem.js';
+import { PickupSystem } from '../collectibles/PickupSystem.js';
 import { ZombieSystem } from '../zombies/ZombieSystem.js';
 import { TurretSystem } from '../turrets/TurretSystem.js';
 import { HoodWeaponSystem } from '../turrets/HoodWeaponSystem.js';
@@ -105,6 +106,15 @@ export class RunScene {
     });
     await this.obstacles.load();
     await this.traffic.load();
+    // Bidones de gasolina para mantenerse en carrera
+    this.pickups = new PickupSystem(this.scene, {
+      onCollect: (x, z) => {
+        this.controller.refuel(GAMEPLAY.fuel.canRefill);
+        this.speedFx.burst(x, z, 6);
+        this.chaseCamera.addImpulse(0.25);
+      }
+    });
+    await this.pickups.load();
     this.hp = GAMEPLAY.obstacles.hp;
     this.mid = new MidProps(this.scene);
     this.near = new NearProps(this.scene);
@@ -216,6 +226,7 @@ export class RunScene {
     this.tumbleweeds.reset();
     this.obstacles.reset();
     this.traffic.reset();
+    this.pickups.reset();
     // Soltar zombis agarrados del carro antes de reciclar
     for (const z of this.latched) this.vehicle.object3D.remove(z.holder);
     this.latched.length = 0;
@@ -408,6 +419,8 @@ export class RunScene {
       if (hit) this.onCrash();
       const tc = this.traffic.update(dt, speed, this.laneSystem);
       if (tc) this.onCrash();
+      this.pickups.update(dt, speed, this.laneSystem, this.controller.snapshot().fuelPct);
+      if (this.controller.outOfFuel && speed < 0.6) this.endRun(); // se quedó sin gasolina
 
       // Zombis + combate (el mundo los trae; la torreta los mata; los gibs vuelan)
       this.zombies.update(dt, speed * dt, speed, this.laneSystem, this.controller.distance);
