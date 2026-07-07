@@ -24,6 +24,7 @@ import { Explosions } from '../vfx/Explosion.js';
 import { SpeedEffects } from '../vfx/SpeedEffects.js';
 import { RunHUD } from '../ui-hud/RunHUD.js';
 import { PlayerState } from '../save/PlayerState.js';
+import { computeUpgradeStats } from '../save/UpgradeStats.js';
 
 const DEBUG = new URLSearchParams(location.search).has('debug');
 
@@ -72,6 +73,18 @@ export class RunScene {
     this.container = document.getElementById('vehicle-stage');
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(GAMEPLAY.fog.color);
+    this.maxHp = GAMEPLAY.obstacles.hp;
+  }
+
+  // Aplica las mejoras del garaje (PlayerState.upgrades) a los stats de la partida
+  applyUpgrades() {
+    const st = computeUpgradeStats(this.state);
+    this.maxHp = st.maxHp;
+    this.hp = st.maxHp;
+    this.controller.speedMul = st.speedMul;
+    this.turret.setStats({ damage: st.turretDamage, fireRate: GAMEPLAY.turret.fireRate * st.turretFireRateMul });
+    // Llantas: cambio de carril más ágil
+    this.laneSystem.changeMul = st.laneSpeedMul;
   }
 
   async load({ equipped }) {
@@ -115,7 +128,7 @@ export class RunScene {
       }
     });
     await this.pickups.load();
-    this.hp = GAMEPLAY.obstacles.hp;
+    this.hp = this.maxHp;
     this.mid = new MidProps(this.scene);
     this.near = new NearProps(this.scene);
     await this.near.load();
@@ -160,6 +173,11 @@ export class RunScene {
     this.latched = [];
     this.shakeMeter = 0;
 
+    // Mejoras del garaje → stats de la partida (hp, daño/cadencia torreta, velocidad)
+    this.applyUpgrades();
+    // Color de torreta guardado por el jugador (editable)
+    if (this.state.equipped?.turretColor) this.turret.applyColor(this.state.equipped.turretColor);
+
     // Ráfaga de polvo al iniciar un cambio de carril + energía de sacudida
     this.laneSystem.onChangeStart = () => {
       this.speedFx.burst(this.vehicle.object3D.position.x, this.vehicle.length * 0.4, 5);
@@ -200,7 +218,7 @@ export class RunScene {
     document.body.classList.add('mode-run');
 
     this.hud.mount();
-    this.hud.setHearts(this.hp, GAMEPLAY.obstacles.hp);
+    this.hud.setHearts(this.hp, this.maxHp);
     this.input.setEnabled(true);
     this.mounted = true;
     this.resize();
@@ -236,7 +254,8 @@ export class RunScene {
     this.hoodWeapon.reset();
     this.gibs.reset();
     this.explosions.reset();
-    this.hp = GAMEPLAY.obstacles.hp;
+    this.applyUpgrades(); // reaplicar mejoras (pudieron cambiar en el garaje)
+    if (this.state.equipped?.turretColor) this.turret.applyColor(this.state.equipped.turretColor);
     this.vehicle.reset();
 
     if (equipped && equipped.carId !== this.vehicle.equippedCarId) {
@@ -257,7 +276,7 @@ export class RunScene {
   // Golpe contra un obstáculo: pierde un corazón, sacude y frena; 0 → fin de run
   onCrash() {
     this.hp -= 1;
-    this.hud.setHearts(this.hp, GAMEPLAY.obstacles.hp);
+    this.hud.setHearts(this.hp, this.maxHp);
     this.chaseCamera.addImpulse(1.3);
     this.speedFx.addImpact(1.3);
     this.controller.applyImpactSlow();
@@ -266,7 +285,7 @@ export class RunScene {
 
   loseHeart(shake = 1) {
     this.hp -= 1;
-    this.hud.setHearts(this.hp, GAMEPLAY.obstacles.hp);
+    this.hud.setHearts(this.hp, this.maxHp);
     this.chaseCamera.addImpulse(shake);
     if (this.hp <= 0) this.endRun();
   }

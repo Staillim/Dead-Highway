@@ -43,6 +43,8 @@ export class TurretSystem {
     this.currentTarget = null;
 
     const cfg = GAMEPLAY.turret;
+    this.dmg = cfg.damage;      // sobreescribible por mejoras
+    this.rate = cfg.fireRate;
     this.pool = [];
     const geo = new THREE.CylinderGeometry(0.06, 0.06, 1.1, 6);
     geo.rotateX(Math.PI / 2);
@@ -89,6 +91,11 @@ export class TurretSystem {
         o.material.color.copy(col);
       }
     });
+  }
+
+  setStats({ damage, fireRate } = {}) {
+    if (damage != null) this.dmg = damage;
+    if (fireRate != null) this.rate = fireRate;
   }
 
   ejectCasing(from) {
@@ -221,7 +228,7 @@ export class TurretSystem {
           this.burstCooldown = burstConfig.burstInterval || 0.08;
         }
         this.fire(target);
-        this.cooldown = 1 / cfg.fireRate;
+        this.cooldown = 1 / this.rate;
       } else {
         this.currentTarget = null;
         this.cooldown = 0.05;
@@ -266,7 +273,7 @@ export class TurretSystem {
         const dir = new THREE.Vector3(tx - p.mesh.position.x, ty - p.mesh.position.y, tz - p.mesh.position.z);
         const dist = dir.length();
         if (dist < 1.2) {
-          this.zombies.hit(p.target, cfg.damage);
+          this.zombies.hit(p.target, this.dmg);
           this.deactivate(p);
           continue;
         }

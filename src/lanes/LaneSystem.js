@@ -45,7 +45,8 @@ export class LaneSystem {
     let targetLean = 0;
 
     if (this.t < 1) {
-      this.t = Math.min(1, this.t + (dt * 1000) / changeMs);
+      // changeMul viene de la mejora de llantas (manejo más ágil)
+      this.t = Math.min(1, this.t + (dt * 1000 * (this.changeMul || 1)) / changeMs);
       const prevX = this.x;
       this.x = this.fromX + (laneCenterX(this.targetLane) - this.fromX) * easeOutCubic(this.t);
       this.velX = dt > 0 ? (this.x - prevX) / dt : 0;

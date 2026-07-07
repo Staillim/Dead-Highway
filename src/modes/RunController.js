@@ -16,6 +16,7 @@ export class RunController {
     this.slow = 1; // factor de ralentización por impacto (recupera solo)
     this.fuel = GAMEPLAY.fuel.max;
     this.outOfFuel = false;
+    this.speedMul = this.speedMul || 1; // bono de motor (mejoras)
   }
 
   // Golpe contra un obstáculo: frena y recupera en slowRecoverS segundos
@@ -36,7 +37,7 @@ export class RunController {
     this.fuel = Math.max(0, this.fuel - GAMEPLAY.fuel.drainPerSec * dt);
     if (this.fuel <= 0) this.outOfFuel = true;
 
-    const target = Math.min(max, base + this.distance * gainPerMeter) * this.slow;
+    const target = Math.min(max * this.speedMul, base + this.distance * gainPerMeter) * this.slow * this.speedMul;
     this.speed = this.outOfFuel ? Math.max(0, this.speed - 30 * dt) : target; // se frena sin gas
     this.distance += this.speed * dt;
   }
