@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { AssetLoader } from '../asset-pipeline/AssetLoader.js';
 import { SocketLoader } from '../systems/sockets/SocketLoader.js';
 import { AttachmentSystem } from '../systems/sockets/AttachmentSystem.js';
@@ -35,7 +36,9 @@ export async function loadEquipped(equipped, { paint = '#cc3333' } = {}) {
     socketData = await SocketLoader.load(equipped.carId);
   } catch (err) {
     log.push({ type: 'sockets', status: 'warn', msg: `Sin socket data: ${err.message}. Usando defaults.` });
-    socketData = createFallbackSockets(equipped.carId);
+    // Fallback RELATIVO al bounding box del carro (los GLB varían de escala;
+    // posiciones fijas mandaban la torreta a volar). El usuario afina en Modo Dev.
+    socketData = createFallbackSockets(equipped.carId, carModel);
   }
 
   for (const [type, folder] of Object.entries(ACCESSORY_FOLDERS)) {
@@ -82,18 +85,39 @@ export async function loadEquipped(equipped, { paint = '#cc3333' } = {}) {
   return { carModel, accessoryNodes, socketData, log };
 }
 
-function createFallbackSockets(carId) {
+function createFallbackSockets(carId, carModel = null) {
+  // Sin carModel: valores neutros (compatibilidad hacia atrás)
+  if (!carModel) {
+    return {
+      carId,
+      sockets: {
+        turret:          { position: [0, 1.0, 0],   rotation: [0, 0, 0], scale: 0.3 },
+        hoodWeapon:      { position: [0, 0.3, 1.0],  rotation: [0, 0, 0], scale: 0.15 },
+        bumperAccessory: { position: [0, 0.1, 1.2],  rotation: [0, 0, 0], scale: 0.4 },
+        doorArmor:       { position: [0.5, 0.3, 0.3], rotation: [0, 0, 0], scale: 0.5 },
+        spikes:          { position: [0, 0.1, 0.8],  rotation: [0, 0, 0], scale: 0.3 }
+      },
+      overrides: {}, compatibility: {}, meshGroups: { wheels: [], turretPart: [], hoodPart: [] }
+    };
+  }
+
+  // Medir el carro en su espacio local para colocar los accesorios SOBRE él,
+  // con una escala proporcional a su tamaño (unidades del GLB varían muchísimo).
+  const box = new THREE.Box3().setFromObject(carModel, true); // precise: vértices reales
+  const c = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const span = Math.max(size.x, size.z, 0.01);
+  const s = span * 0.16;             // escala base de accesorio ~16% del largo
+  const front = box.max.z;           // convención +Z = frente
   return {
     carId,
     sockets: {
-      turret:         { position: [0, 1.0, 0],   rotation: [0, 0, 0], scale: 0.3 },
-      hoodWeapon:     { position: [0, 0.3, 1.0],  rotation: [0, 0, 0], scale: 0.15 },
-      bumperAccessory:{ position: [0, 0.1, 1.2],  rotation: [0, 0, 0], scale: 0.4 },
-      doorArmor:      { position: [0.5, 0.3, 0.3], rotation: [0, 0, 0], scale: 0.5 },
-      spikes:         { position: [0, 0.1, 0.8],  rotation: [0, 0, 0], scale: 0.3 }
+      turret:          { position: [c.x, box.max.y, c.z], rotation: [0, 0, 0], scale: s },
+      hoodWeapon:      { position: [c.x, c.y + size.y * 0.15, front * 0.55], rotation: [0, 0, 0], scale: s * 0.6 },
+      bumperAccessory: { position: [c.x, box.min.y + size.y * 0.28, front], rotation: [0, 0, 0], scale: s * 1.3 },
+      doorArmor:       { position: [box.max.x, c.y, c.z], rotation: [0, Math.PI / 2, 0], scale: s },
+      spikes:          { position: [c.x, box.min.y + size.y * 0.2, front], rotation: [0, 0, 0], scale: s }
     },
-    overrides: {},
-    compatibility: {},
-    meshGroups: { wheels: [], turretPart: [], hoodPart: [] }
+    overrides: {}, compatibility: {}, meshGroups: { wheels: [], turretPart: [], hoodPart: [] }
   };
 }

@@ -52,18 +52,27 @@ export class ZombieSystem {
         continue;
       }
 
-      const box = new THREE.Box3().setFromObject(template);
-      const size = box.getSize(new THREE.Vector3());
-      const scale = (GAMEPLAY.zombies.height / Math.max(size.y, 0.001)) * (zcfg.scale ?? cfg.scale);
       const posture = zcfg.posture || {};
       const walkCfg = zcfg.walk || {};
       const grabCfg = zcfg.grab || {};
 
+      // IMPORTANTE: estos GLB tienen el ESQUELETO bajo un nodo con escala distinta
+      // a la del mesh. `setFromObject` mide el mesh (da una altura falsa ~4x menor)
+      // y sobre-escala al zombi a ~6 m. Hay que medir por los HUESOS reales.
+      const probe = skeletonClone(template);
+      this.scene.add(probe);
+      probe.updateMatrixWorld(true);
+      const { min: boneMin, max: boneMax } = boneExtentY(probe);
+      this.scene.remove(probe);
+      const boneH = Math.max(0.001, boneMax - boneMin);
+      const realH = boneH * 1.15; // los huesos subestiman cabeza/pies ~15%
+      const scale = (GAMEPLAY.zombies.height / realH) * (zcfg.scale ?? cfg.scale);
+      const footOffset = boneMin * scale; // para plantar los pies en y=0
+
       for (let i = 0; i < GAMEPLAY.zombies.poolPerType; i++) {
         const model = skeletonClone(template);
         model.scale.setScalar(scale);
-        const b2 = new THREE.Box3().setFromObject(model);
-        model.position.y = -b2.min.y;
+        model.position.y = -footOffset;
         model.traverse((o) => {
           if (o.isMesh) {
             o.frustumCulled = false;
@@ -156,9 +165,10 @@ export class ZombieSystem {
       z.x += THREE.MathUtils.clamp(laneSystem.x - z.x, -homing, homing);
       z.holder.position.set(z.x, 0, z.z);
 
-      // Encara hacia el carro (mira a +Z, hacia la cámara)
+      // Encara hacia el carro (el frente del GLB es +Z, hacia la cámara): SIN
+      // el Math.PI que lo volteaba de espaldas y lo hacía caminar al revés.
       const dx = laneSystem.x - z.x;
-      z.holder.rotation.y = Math.PI + Math.atan2(dx, Math.max(2, z.z * -1)) * 0.6;
+      z.holder.rotation.y = Math.atan2(dx, Math.max(2, z.z * -1)) * 0.6;
 
       // Animación de caminar/correr
       const walkIntensity = z.walkCfg?.intensity ?? (z.type === 'runner' ? 1 : z.type === 'fat' ? 0.2 : 0.5);
@@ -239,4 +249,19 @@ export class ZombieSystem {
 
 function pick(pool, type) {
   return pool.find((z) => !z.active && z.type === type);
+}
+
+// Extensión vertical del ESQUELETO en mundo (fiable para skinned meshes, a
+// diferencia de setFromObject que mide el nodo del mesh y no los huesos).
+const _bp = new THREE.Vector3();
+function boneExtentY(root) {
+  let min = Infinity;
+  let max = -Infinity;
+  root.traverse((o) => {
+    if (!o.isBone) return;
+    o.getWorldPosition(_bp);
+    if (_bp.y < min) min = _bp.y;
+    if (_bp.y > max) max = _bp.y;
+  });
+  return { min: min === Infinity ? 0 : min, max: max === -Infinity ? 1 : max };
 }
