@@ -146,7 +146,28 @@ export const GAMEPLAY = {
     fireRate: 10,          // disparos por segundo
     projectileSpeed: 165,  // m/s
     damage: 1,
-    projectilePool: 48
+    projectilePool: 48,
+
+    // Tipos de bala: cada uno con su color de trazadora, velocidad, daño y efecto.
+    //  · burst        → ráfaga automática (n tiros seguidos por gatillo)
+    //  · pierce       → atraviesa a n zombis dañando a cada uno
+    //  · explodeR     → estalla al impactar y daña en área (radio en m)
+    bulletTypes: {
+      standard:  { color: 0xffdd66, tracer: 1.0,  speedMul: 1.0,  damageMul: 1.0, burst: 1 },
+      rapid:     { color: 0x66e0ff, tracer: 0.75, speedMul: 1.2,  damageMul: 0.7, burst: 3, burstInterval: 0.06 },
+      piercing:  { color: 0xc4ff6a, tracer: 1.15, speedMul: 1.45, damageMul: 1.0, burst: 1, pierce: 3 },
+      heavy:     { color: 0xff8a3a, tracer: 1.6,  speedMul: 0.9,  damageMul: 2.4, burst: 1 },
+      explosive: { color: 0xff5a4a, tracer: 1.35, speedMul: 0.95, damageMul: 1.4, burst: 1, explodeR: 4.2 }
+    },
+    // La munición MEJORA con el nivel de la torreta (mejoras del garaje): se elige
+    // el tier más alto cuyo `at` no supere el nivel actual.
+    ammoTiers: [
+      { at: 1, type: 'standard' },
+      { at: 3, type: 'rapid' },
+      { at: 5, type: 'piercing' },
+      { at: 7, type: 'heavy' },
+      { at: 9, type: 'explosive' }
+    ]
   },
 
   // Arma de capó: dispara hacia adelante, sin auto-target

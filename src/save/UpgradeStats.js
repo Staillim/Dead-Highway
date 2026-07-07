@@ -1,4 +1,5 @@
 import { VEHICLE_UPGRADES } from '../vehicles/VehicleConfig.js';
+import { GAMEPLAY } from '../config/gameplay.js';
 
 // Convierte los niveles de mejora (PlayerState.upgrades) en stats efectivos que
 // SÍ afectan la partida. Cada nivel por encima del base suma un bono.
@@ -6,7 +7,16 @@ export function computeUpgradeStats(state) {
   const up = state?.upgrades || {};
   const lvl = (k) => up[k] ?? VEHICLE_UPGRADES[k]?.level ?? 1;
 
+  // Munición: el tier más alto desbloqueado por el nivel de la torreta
+  const turretLvl = lvl('turret');
+  let ammoType = 'standard';
+  for (const tier of GAMEPLAY.turret.ammoTiers) {
+    if (turretLvl >= tier.at) ammoType = tier.type;
+  }
+
   return {
+    turretLevel: turretLvl,
+    ammoType,
     // Blindaje: +1 corazón cada 3 niveles (máx +3 sobre la base de 3)
     maxHp: 3 + Math.min(3, Math.floor((lvl('armor') - 1) / 3)),
     // Torreta: más daño y cadencia por nivel

@@ -84,6 +84,9 @@ export class RunScene {
     this.hp = st.maxHp;
     this.controller.speedMul = st.speedMul;
     this.turret.setStats({ damage: st.turretDamage, fireRate: GAMEPLAY.turret.fireRate * st.turretFireRateMul });
+    // Munición desbloqueada por el nivel de la torreta (override dev: ?ammo=explosive)
+    const ammoOverride = new URLSearchParams(location.search).get('ammo');
+    this.turret.setBulletType(ammoOverride && GAMEPLAY.turret.bulletTypes[ammoOverride] ? ammoOverride : st.ammoType);
     // Llantas: cambio de carril más ágil
     this.laneSystem.changeMul = st.laneSpeedMul;
   }
@@ -169,7 +172,9 @@ export class RunScene {
       onReachCar: (z) => this.tryLatch(z)
     });
     await this.zombies.load();
-    this.turret = new TurretSystem(this.scene, this.vehicle, this.zombies);
+    this.turret = new TurretSystem(this.scene, this.vehicle, this.zombies, {
+      onExplode: (x, z) => { this.explosions.boom(x, z); this.chaseCamera.addImpulse(0.5); this.speedFx.addImpact(0.4); }
+    });
     this.hoodWeapon = new HoodWeaponSystem(this.scene, this.vehicle, this.zombies);
     this.latched = [];
     this.shakeMeter = 0;

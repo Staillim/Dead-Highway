@@ -31,10 +31,11 @@ function resolveMeshGroup(model, paths) {
 }
 
 export class TurretSystem {
-  constructor(scene, vehicle, zombieSystem) {
+  constructor(scene, vehicle, zombieSystem, { onExplode } = {}) {
     this.scene = scene;
     this.vehicle = vehicle;
     this.zombies = zombieSystem;
+    this.onExplode = onExplode;   // (x, z, r) → onda visual para balas explosivas
     this.cooldown = 0;
     this.muzzleIdx = 0;
     this.muzzle = new THREE.Vector3();
@@ -45,15 +46,18 @@ export class TurretSystem {
     const cfg = GAMEPLAY.turret;
     this.dmg = cfg.damage;      // sobreescribible por mejoras
     this.rate = cfg.fireRate;
+    // Tipo de bala activo (lo fija applyUpgrades según el nivel de la torreta)
+    this.bulletKey = 'standard';
+    this.bulletCfg = cfg.bulletTypes.standard;
     this.pool = [];
     const geo = new THREE.CylinderGeometry(0.06, 0.06, 1.1, 6);
     geo.rotateX(Math.PI / 2);
-    const mat = new THREE.MeshBasicMaterial({ color: 0xffdd66, fog: false });
+    this.projMat = new THREE.MeshBasicMaterial({ color: this.bulletCfg.color, fog: false });
     for (let i = 0; i < cfg.projectilePool; i++) {
-      const mesh = new THREE.Mesh(geo, mat);
+      const mesh = new THREE.Mesh(geo, this.projMat);
       mesh.visible = false;
       scene.add(mesh);
-      this.pool.push({ mesh, active: false, target: null, life: 0, vel: new THREE.Vector3() });
+      this.pool.push({ mesh, active: false, target: null, life: 0, vel: new THREE.Vector3(), pierce: 0, explodeR: 0, dmgMul: 1, hitSet: new Set() });
     }
 
     this.flash = new THREE.Sprite(
@@ -96,6 +100,17 @@ export class TurretSystem {
   setStats({ damage, fireRate } = {}) {
     if (damage != null) this.dmg = damage;
     if (fireRate != null) this.rate = fireRate;
+  }
+
+  // Cambia el tipo de bala (standard/rapid/piercing/heavy/explosive). Tiñe la
+  // trazadora y el fogonazo del color de la munición.
+  setBulletType(key) {
+    const types = GAMEPLAY.turret.bulletTypes;
+    if (!types[key]) return;
+    this.bulletKey = key;
+    this.bulletCfg = types[key];
+    this.projMat.color.setHex(this.bulletCfg.color);
+    this.flash.material.color.setHex(this.bulletCfg.color);
   }
 
   ejectCasing(from) {
@@ -172,19 +187,26 @@ export class TurretSystem {
     const muzzlePos = muzzleData.pos || muzzleData;
     this.muzzleIdx++;
 
+    const bc = this.bulletCfg;
     p.active = true;
     p.target = target;
     p.life = 1.2;
+    p.pierce = bc.pierce || 0;
+    p.explodeR = bc.explodeR || 0;
+    p.dmgMul = bc.damageMul || 1;
+    p.hitSet.clear();
     p.mesh.position.copy(muzzlePos);
+    p.mesh.scale.setScalar(bc.tracer || 1);   // trazadora más gruesa/fina según munición
     p.mesh.visible = true;
 
     const cfg = GAMEPLAY.turret;
+    p.speed = cfg.projectileSpeed * (bc.speedMul || 1);
     p.vel.set(target.x - muzzlePos.x, 0.4 - muzzlePos.y + 0.9, target.z - muzzlePos.z).normalize()
-      .multiplyScalar(cfg.projectileSpeed);
+      .multiplyScalar(p.speed);
 
     this.flash.position.copy(muzzlePos);
     this.flashT = 0.09;
-    this.flash.scale.setScalar(1.7 + Math.random() * 0.5);
+    this.flash.scale.setScalar((1.7 + Math.random() * 0.5) * (bc.tracer || 1));
     this.recoil = 1;              // patea el cañón
     this.ejectCasing(muzzlePos);  // expulsa casquillo
   }
@@ -209,7 +231,7 @@ export class TurretSystem {
           this.fire(target);
           this.burstRemaining--;
           const burstConfig = this.getCurrentBurstConfig();
-          this.burstCooldown = (burstConfig?.burstInterval) || 0.08;
+          this.burstCooldown = (burstConfig?.burstInterval) || this.bulletCfg.burstInterval || 0.08;
         } else {
           this.burstRemaining = 0;
           this.currentTarget = null;
@@ -223,9 +245,12 @@ export class TurretSystem {
       if (target) {
         this.currentTarget = target;
         const burstConfig = this.getCurrentBurstConfig();
-        if (burstConfig && burstConfig.fireMode === 'burst' && (burstConfig.burstCount || 2) > 1) {
-          this.burstRemaining = (burstConfig.burstCount || 2) - 1;
-          this.burstCooldown = burstConfig.burstInterval || 0.08;
+        // Ráfaga: la del socket manda; si no hay, la define el tipo de bala
+        const socketBurst = (burstConfig && burstConfig.fireMode === 'burst') ? (burstConfig.burstCount || 2) : 0;
+        const burstCount = socketBurst || this.bulletCfg.burst || 1;
+        if (burstCount > 1) {
+          this.burstRemaining = burstCount - 1;
+          this.burstCooldown = burstConfig?.burstInterval || this.bulletCfg.burstInterval || 0.08;
         }
         this.fire(target);
         this.cooldown = 1 / this.rate;
@@ -265,26 +290,55 @@ export class TurretSystem {
     for (const p of this.pool) {
       if (!p.active) continue;
       p.life -= dt;
+      const dmg = Math.max(1, Math.round(this.dmg * p.dmgMul));
+      const ax = p.mesh.position.x, ay = p.mesh.position.y, az = p.mesh.position.z;
 
-      if (p.target && p.target.active && p.target.state === 'walk') {
-        const tx = p.target.x;
-        const ty = 0.9;
-        const tz = p.target.z;
-        const dir = new THREE.Vector3(tx - p.mesh.position.x, ty - p.mesh.position.y, tz - p.mesh.position.z);
-        const dist = dir.length();
-        if (dist < 1.2) {
-          this.zombies.hit(p.target, this.dmg);
-          this.deactivate(p);
-          continue;
-        }
-        dir.normalize().multiplyScalar(cfg.projectileSpeed);
-        p.vel.lerp(dir, 0.35);
+      // Guiado: mientras su objetivo viva (y no lo haya atravesado ya), reorienta
+      // la velocidad hacia él. El impacto se resuelve por barrido abajo.
+      if (p.target && p.target.active && p.target.state === 'walk' && !p.hitSet.has(p.target)) {
+        const dir = new THREE.Vector3(p.target.x - ax, 0.9 - ay, p.target.z - az);
+        if (dir.lengthSq() > 1e-6) { dir.normalize().multiplyScalar(p.speed); p.vel.lerp(dir, 0.35); }
       }
 
-      p.mesh.position.addScaledVector(p.vel, dt);
-      p.mesh.lookAt(p.mesh.position.clone().add(p.vel));
+      // Posición nueva (aún no aplicada): colisión por BARRIDO del segmento A→B.
+      // Evita el tunneling de balas rápidas (240 m/s ≈ 3.8 m/frame) contra zombis.
+      const bx = ax + p.vel.x * dt, by = ay + p.vel.y * dt, bz = az + p.vel.z * dt;
+      for (const t of this.zombies.getTargets()) {
+        if (p.hitSet.has(t)) continue;
+        if (this._segDist2(t.x, t.z, ax, az, bx, bz) >= 1.44) continue;
+        if (p.explodeR > 0) { this._explodeAt(t.x, t.z, p.explodeR, dmg); this.deactivate(p); break; }
+        this.zombies.hit(t, dmg);
+        p.hitSet.add(t);
+        if (p.pierce > 0) { p.pierce--; p.target = null; } // atraviesa: sigue recto
+        else { this.deactivate(p); break; }
+      }
+      if (!p.active) continue;
+
+      p.mesh.position.set(bx, by, bz);
+      p.mesh.lookAt(bx + p.vel.x, by + p.vel.y, bz + p.vel.z);
       if (p.life <= 0 || p.mesh.position.z > 12) this.deactivate(p);
     }
+  }
+
+  // Distancia² del punto (px,pz) al segmento A(ax,az)→B(bx,bz) en el plano XZ.
+  _segDist2(px, pz, ax, az, bx, bz) {
+    const abx = bx - ax, abz = bz - az;
+    const len2 = abx * abx + abz * abz;
+    let t = len2 > 1e-6 ? ((px - ax) * abx + (pz - az) * abz) / len2 : 0;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const dx = px - (ax + t * abx), dz = pz - (az + t * abz);
+    return dx * dx + dz * dz;
+  }
+
+  // Estallido de bala explosiva: daña a todos los zombis dentro del radio y
+  // dispara la onda visual (RunScene la conecta a this.explosions.boom).
+  _explodeAt(x, z, r, dmg) {
+    const r2 = r * r;
+    for (const t of this.zombies.getTargets()) {
+      const dx = t.x - x, dz = t.z - z;
+      if (dx * dx + dz * dz <= r2) this.zombies.hit(t, dmg);
+    }
+    this.onExplode?.(x, z, r);
   }
 
   aimTurret(dt) {
