@@ -7,6 +7,7 @@ import { MaterialScanner } from '../../asset-pipeline/MaterialScanner.js';
 import { PaintCustomizer } from '../../materials/PaintCustomizer.js';
 import { ZombieRig } from '../../zombies/ZombieRig.js';
 import { loadZombieClips } from '../../zombies/ZombieAnimations.js';
+import { clone as skeletonClone } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 // --- Descubrir assets con Vite ---------------------------------------------
 const assetGlobs = {
@@ -1616,7 +1617,10 @@ async function loadZombie() {
 
   try {
     const url = `/models/zombies/zombie_${ztype}.glb`;
-    state.zombieModel = await AssetLoader.loadModel(url);
+    // SkeletonUtils.clone (NO loadModel/clone plano): preserva el binding del
+    // esqueleto. Con clone(true) el mesh no seguía a los huesos y quedaba minúsculo.
+    const template = await AssetLoader.loadTemplate(url);
+    state.zombieModel = skeletonClone(template);
     scene.add(state.zombieModel);
 
     state.zombieRig = new ZombieRig(state.zombieModel);
@@ -1653,14 +1657,28 @@ async function loadZombie() {
       };
     }
 
-    // Normalizar altura a 1.5m y apoyar en el suelo (mismo pipeline que ZombieSystem)
-    const rawBox = new THREE.Box3().setFromObject(state.zombieModel);
-    const rawSize = rawBox.getSize(new THREE.Vector3());
+    // Normalizar por HUESOS (mismo criterio que ZombieSystem). Estos GLB tienen
+    // el esqueleto bajo un nodo con escala distinta al mesh: medir con
+    // setFromObject daba un tamaño falso y los HUESOS quedaban flotando arriba
+    // (y al no coincidir con el modelo, no se podían clicar/mover).
+    state.zombieModel.scale.setScalar(1);
+    state.zombieModel.position.set(0, 0, 0);
+    state.zombieModel.updateMatrixWorld(true);
+    const _wp = new THREE.Vector3();
+    let bMin = Infinity, bMax = -Infinity;
+    state.zombieModel.traverse((o) => {
+      if (!o.isBone) return;
+      o.getWorldPosition(_wp);
+      if (_wp.y < bMin) bMin = _wp.y;
+      if (_wp.y > bMax) bMax = _wp.y;
+    });
+    if (bMin === Infinity) { bMin = 0; bMax = 1; }
+    const boneH = Math.max(0.001, (bMax - bMin) * 1.15); // huesos subestiman cabeza/pies ~15%
     const cfgScale = state.zombieConfig.scale || 1;
-    const normScale = (1.5 / Math.max(rawSize.y, 0.001)) * cfgScale;
+    const normScale = (1.5 / boneH) * cfgScale;
     state.zombieModel.scale.setScalar(normScale);
-    const box2 = new THREE.Box3().setFromObject(state.zombieModel);
-    state.zombieModel.position.set(0, -box2.min.y, 0);
+    state.zombieModel.position.set(0, -bMin * normScale, 0); // plantar el hueso más bajo en y=0
+    state.zombieModel.updateMatrixWorld(true);
     state.zombiePlantY = state.zombieModel.position.y;   // altura base (para el reset de la muerte)
 
     document.getElementById('z-scale').value = state.zombieConfig.scale || 1;
