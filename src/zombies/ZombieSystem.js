@@ -3,6 +3,7 @@ import { clone as skeletonClone } from 'three/examples/jsm/utils/SkeletonUtils.j
 import { GAMEPLAY, laneCenterX } from '../config/gameplay.js';
 import { AssetLoader } from '../asset-pipeline/AssetLoader.js';
 import { ZombieRig } from './ZombieRig.js';
+import { loadZombieClips } from './ZombieAnimations.js';
 
 const TYPE_URLS = {
   normal: '/models/zombies/zombie_normal.glb',
@@ -26,6 +27,9 @@ export class ZombieSystem {
   }
 
   async load() {
+    // Animaciones FBX (Mixamo) reencauzadas al esqueleto Tripo (una vez)
+    this.clips = await loadZombieClips();
+
     const zombieConfigs = {};
     for (const type of Object.keys(TYPE_URLS)) {
       try {
@@ -85,20 +89,50 @@ export class ZombieSystem {
         holder.visible = false;
         this.scene.add(holder);
 
+        // Mixer + acciones FBX por zombi (cada uno con su esqueleto clonado)
+        const mixer = new THREE.AnimationMixer(model);
+        const actions = {};
+        for (const [key, clip] of Object.entries(this.clips || {})) {
+          if (clip) actions[key] = mixer.clipAction(clip);
+        }
+
         this.pool.push({
           type,
           cfg,
           holder,
           model,
           rig: new ZombieRig(model, posture),
+          mixer,
+          actions,
+          animMode: 'procedural',   // 'procedural' | 'crawl' | 'scream' | 'biting' | 'death'
           posture,
           walkCfg,
           grabCfg,
-          active: false,
+          active: false, crawler: false, screamed: false, screamT: 0,
           x: 0, z: 0, hp: 0, phase: 0, dead: false, state: 'walk'
         });
       }
     }
+  }
+
+  // Cambia la animación del zombi con crossfade. 'procedural' = rig.walk() por código.
+  playAnim(z, mode, { once = false, fade = 0.18 } = {}) {
+    if (z.animMode === mode && !once) return;
+    const prev = z.currentAction;
+    if (mode === 'procedural' || !z.actions[mode]) {
+      if (prev) prev.fadeOut(fade);
+      z.currentAction = null;
+      z.animMode = 'procedural';
+      return;
+    }
+    const action = z.actions[mode];
+    action.enabled = true;
+    action.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, Infinity);
+    action.clampWhenFinished = once;
+    action.reset().fadeIn(fade).play();
+    if (prev && prev !== action) prev.fadeOut(fade);
+    z.currentAction = action;
+    z.animMode = mode;
   }
 
   allowedTypes(distance) {
@@ -128,6 +162,16 @@ export class ZombieSystem {
     z.holder.rotation.y = 0;
     z.holder.scale.setScalar(1);
     z.holder.visible = true;
+
+    // Comportamiento: algunos se arrastran; el resto está "idle" hasta ver el
+    // coche (grita = scream) y recién ahí corre. Los gordos no gritan.
+    z.crawler = z.type !== 'fat' && Math.random() < GAMEPLAY.zombies.crawlChance && !!z.actions.crawl;
+    z.screamed = false;
+    z.screaming = false;
+    z.screamT = 0;
+    if (z.crawler) this.playAnim(z, 'crawl');
+    else this.playAnim(z, 'procedural');
+
     this.active.push(z);
   }
 
@@ -146,52 +190,76 @@ export class ZombieSystem {
     }
 
     const despawnZ = GAMEPLAY.zombies.despawnZ;
+    const zc = GAMEPLAY.zombies;
     for (let i = this.active.length - 1; i >= 0; i--) {
       const z = this.active[i];
 
+      // El mixer siempre avanza (mueve los huesos cuando hay clip FBX activo)
+      z.mixer.update(dt);
+
       if (z.state === 'dying') {
+        // Se sigue moviendo con el flujo del mundo mientras cae/desaparece
+        z.z += worldDz;
+        z.holder.position.z = z.z;
         z.dieT -= dt;
         if (z.dieT <= 0) this.recycle(i);
         continue;
       }
       if (z.state === 'latched') {
-        // La lógica de agarre la maneja RunScene (Fase 4); acá solo lo seguimos
+        // Posición la maneja RunScene (Fase 4); acá solo animamos "biting"
         continue;
       }
 
+      const dx = laneSystem.x - z.x;
+
+      // Visión: si aún no gritó y el coche entra en su rango → SCREAM y luego corre
+      if (!z.screamed && !z.crawler && !z.screaming && Math.abs(z.z) < zc.detectZ && z.actions.scream) {
+        z.screaming = true;
+        z.screamT = (this.clips.scream?.duration || 1) * 0.75;
+        this.playAnim(z, 'scream', { once: true });
+      }
+
+      // Velocidad: arrastrándose y "idle" (antes de gritar) van lento; tras gritar, a tope
+      let homingMul = 1;
+      let velMul = 1;
+      if (z.screaming) {
+        homingMul = 0; velMul = 0; // congelado gritando
+        z.screamT -= dt;
+        if (z.screamT <= 0) { z.screaming = false; z.screamed = true; this.playAnim(z, 'procedural'); }
+      } else if (z.crawler) {
+        homingMul = 0.6; velMul = 0.55;
+      } else if (!z.screamed) {
+        homingMul = zc.screamHomingMul; velMul = zc.screamHomingMul;
+      }
+
       // Movimiento: el mundo lo trae + su locomoción propia; se dirige al carril
-      z.z += worldDz + z.cfg.ownVel * dt;
-      const homing = z.cfg.homingX * dt;
+      z.z += worldDz + z.cfg.ownVel * dt * velMul;
+      const homing = z.cfg.homingX * dt * homingMul;
       z.x += THREE.MathUtils.clamp(laneSystem.x - z.x, -homing, homing);
       z.holder.position.set(z.x, 0, z.z);
-
-      // Encara hacia el carro (el frente del GLB es +Z, hacia la cámara): SIN
-      // el Math.PI que lo volteaba de espaldas y lo hacía caminar al revés.
-      const dx = laneSystem.x - z.x;
       z.holder.rotation.y = Math.atan2(dx, Math.max(2, z.z * -1)) * 0.6;
 
-      // Animación de caminar/correr
-      const walkIntensity = z.walkCfg?.intensity ?? (z.type === 'runner' ? 1 : z.type === 'fat' ? 0.2 : 0.5);
-      const walkHunch = z.walkCfg?.hunch ?? (z.type === 'fat' ? 0.35 : 0.6);
-      z.phase += dt * (4 + z.cfg.run * 6);
-      z.rig.walk(z.phase, walkIntensity, walkHunch);
+      // Animación procedural de caminar SOLO si no hay clip FBX gobernando
+      if (z.animMode === 'procedural') {
+        const walkIntensity = z.walkCfg?.intensity ?? (z.type === 'runner' ? 1 : z.type === 'fat' ? 0.2 : 0.5);
+        const walkHunch = z.walkCfg?.hunch ?? (z.type === 'fat' ? 0.35 : 0.6);
+        z.phase += dt * (4 + z.cfg.run * 6);
+        z.rig.walk(z.phase, walkIntensity, walkHunch);
+      }
 
       // Gordo: explota por PROXIMIDAD (no requiere contacto — el arador no protege)
       if (z.type === 'fat') {
         const near = Math.abs(z.z) < z.cfg.explodeR && Math.abs(dx) < GAMEPLAY.lanes.width * 1.4;
         if (near) {
           this.onFatExplode?.(z.x, z.z, z.cfg);
-          this.kill(z, true);
-          this.recycle(i);
+          this.beginDeath(z, { explode: true });
           continue;
         }
       } else if (Math.abs(z.z) < 1.6 && Math.abs(dx) < GAMEPLAY.lanes.width * 0.6) {
-        // Flaco alcanza el carro en su carril → daño / agarre (Fase 4)
+        // Flaco alcanza el carro en su carril → agarre (biting) o atropello
         const latched = this.onReachCar?.(z);
-        if (!latched) {
-          this.kill(z, false);
-          this.recycle(i);
-        }
+        if (latched) { this.playAnim(z, 'biting'); }
+        else { this.beginDeath(z, { ranOver: true }); }
         continue;
       }
 
@@ -204,10 +272,12 @@ export class ZombieSystem {
     if (!z.active || z.state === 'dying') return false;
     z.hp -= dmg;
     if (z.hp <= 0) {
-      const idx = this.active.indexOf(z);
-      this.kill(z, z.type === 'fat');
-      if (z.type === 'fat') this.onFatExplode?.(z.x, z.z, z.cfg);
-      if (idx >= 0) this.recycle(idx);
+      if (z.type === 'fat') {
+        this.onFatExplode?.(z.x, z.z, z.cfg);   // explosión + gibs (solo gordos)
+        this.beginDeath(z, { explode: true });
+      } else {
+        this.beginDeath(z);                       // anim de muerte (cae)
+      }
       return true;
     }
     // parpadeo de impacto
@@ -218,10 +288,23 @@ export class ZombieSystem {
     return false;
   }
 
-  kill(z, gibbed) {
+  // Inicia la muerte: los gordos explotan (gibs, ya disparados por el caller); el
+  // resto reproduce la animación de muerte (cae al suelo) y luego se recicla.
+  beginDeath(z, { explode = false } = {}) {
     z.dead = true;
-    this.onKill?.(z, gibbed);
-    z.holder.visible = false;
+    z.state = 'dying';
+    if (explode) {
+      z.holder.visible = false;
+      z.dieT = 0.05;
+    } else if (z.actions.death) {
+      this.playAnim(z, 'death', { once: true });
+      z.dieT = (this.clips.death?.duration || 1.6) + 0.6; // cae y descansa un momento
+    } else {
+      // sin clip de muerte → gibs de respaldo
+      this.onKill?.(z, false);
+      z.holder.visible = false;
+      z.dieT = 0.05;
+    }
   }
 
   recycle(activeIndex) {
@@ -229,6 +312,9 @@ export class ZombieSystem {
     z.active = false;
     z.state = 'walk';
     z.holder.visible = false;
+    z.mixer.stopAllAction();
+    z.animMode = 'procedural';
+    z.currentAction = null;
     this.active.splice(activeIndex, 1);
   }
 
@@ -241,6 +327,9 @@ export class ZombieSystem {
     for (const z of this.active) {
       z.active = false;
       z.holder.visible = false;
+      z.mixer?.stopAllAction();
+      z.animMode = 'procedural';
+      z.currentAction = null;
     }
     this.active.length = 0;
     this.waveTimer = 2;

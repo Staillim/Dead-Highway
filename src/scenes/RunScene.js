@@ -287,7 +287,9 @@ export class RunScene {
     for (let i = this.latched.length - 1; i >= 0; i--) {
       const z = this.latched[i];
       z.latchT += dt;
-      z.rig.grab(z.latchT, z.grabCfg);
+      z.mixer?.update(dt);
+      // Si tiene clip "biting" (FBX) lo gobierna el mixer; si no, pose procedural
+      if (z.animMode !== 'biting') z.rig.grab(z.latchT, z.grabCfg);
       z.holder.position.y = 0.3 + Math.sin(z.latchT * 8) * 0.04; // se zarandea
 
       // Drenaje: cada tanto roba un corazón si sigue agarrado

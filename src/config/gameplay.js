@@ -112,9 +112,12 @@ export const GAMEPLAY = {
     poolPerType: 9,        // instancias por tipo en el pool (~27 total)
     spawnZ: -120,          // dónde nacen (adelante)
     despawnZ: 30,          // detrás del carro → reciclar
-    height: 1.5,           // altura objetivo al normalizar (más pequeños que 1:1 real)
+    height: 1.7,           // altura objetivo (un poco más grandes, ~tamaño coche)
     waveMinS: 1.5,         // intervalo entre spawns dentro de una oleada
     waveMaxS: 3.0,
+    crawlChance: 0.2,      // fracción que aparece arrastrándose (anim crawl)
+    detectZ: 75,           // a esta distancia el zombi ve el coche y grita (scream)
+    screamHomingMul: 0.3,  // antes de gritar avanza lento; tras gritar, a tope
     // curva de dificultad GDD §9: qué tipos según distancia
     unlock: { runner: 500, fat: 1500 },
     types: {

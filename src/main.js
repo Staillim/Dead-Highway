@@ -91,6 +91,7 @@ async function init() {
   // Acceso para depuración desde consola / herramientas de preview
   window.__engine = engine;
   window.__scenes = scenes;
+  window.__inspectFbx = async (url) => (await import('./zombies/ZombieAnimations.js')).inspectFbx(url);
 }
 
 init();
