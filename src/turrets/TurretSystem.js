@@ -60,6 +60,46 @@ export class TurretSystem {
     this.flash.scale.setScalar(1.4);
     scene.add(this.flash);
     this.flashT = 0;
+
+    // Retroceso del cañón al disparar
+    this.recoil = 0;
+
+    // Casquillos expulsados (sprites pequeños con gravedad)
+    this.casings = [];
+    const casingMat = new THREE.MeshBasicMaterial({ color: 0xd9b24a, fog: false });
+    const casingGeo = new THREE.BoxGeometry(0.05, 0.05, 0.12);
+    for (let i = 0; i < 16; i++) {
+      const m = new THREE.Mesh(casingGeo, casingMat);
+      m.visible = false;
+      scene.add(m);
+      this.casings.push({ mesh: m, active: false, life: 0, vel: new THREE.Vector3(), spin: 0 });
+    }
+    this.casingCursor = 0;
+  }
+
+  // Tinte de la torreta (editable). Aplica a los materiales del modelo de torreta.
+  applyColor(hex) {
+    const turretNode = this.vehicle.accessoryNodes?.turret;
+    const model = turretNode?.userData?.accessoryModel || turretNode?.children?.[0];
+    if (!model) return;
+    const col = new THREE.Color(hex);
+    model.traverse((o) => {
+      if (o.isMesh && o.material) {
+        if (!o.material._dhCloned) { o.material = o.material.clone(); o.material._dhCloned = true; }
+        o.material.color.copy(col);
+      }
+    });
+  }
+
+  ejectCasing(from) {
+    const c = this.casings[this.casingCursor];
+    this.casingCursor = (this.casingCursor + 1) % this.casings.length;
+    c.active = true;
+    c.life = 0.6;
+    c.mesh.position.copy(from);
+    c.vel.set((Math.random() - 0.3) * 2.5, 1.5 + Math.random(), 1 + Math.random() * 2);
+    c.spin = (Math.random() - 0.5) * 20;
+    c.mesh.visible = true;
   }
 
   getMuzzles() {
@@ -136,7 +176,10 @@ export class TurretSystem {
       .multiplyScalar(cfg.projectileSpeed);
 
     this.flash.position.copy(muzzlePos);
-    this.flashT = 0.06;
+    this.flashT = 0.09;
+    this.flash.scale.setScalar(1.7 + Math.random() * 0.5);
+    this.recoil = 1;              // patea el cañón
+    this.ejectCasing(muzzlePos);  // expulsa casquillo
   }
 
   getCurrentBurstConfig() {
@@ -187,9 +230,29 @@ export class TurretSystem {
 
     this.aimTurret(dt);
 
+    // Retroceso del cañón (patea y recupera)
+    this.recoil = Math.max(0, this.recoil - dt * 9);
+    const turretNode = this.vehicle.accessoryNodes?.turret;
+    const tModel = turretNode?.userData?.accessoryModel || turretNode?.children?.[0];
+    if (tModel) {
+      if (tModel.userData._restZ === undefined) tModel.userData._restZ = tModel.position.z;
+      tModel.position.z = tModel.userData._restZ + this.recoil * 0.12;
+    }
+
     if (this.flashT > 0) {
       this.flashT -= dt;
-      this.flash.material.opacity = Math.max(0, this.flashT / 0.06) * 0.9;
+      this.flash.material.opacity = Math.max(0, this.flashT / 0.09) * 1.1;
+    }
+
+    // Casquillos: gravedad + giro + fade
+    for (const c of this.casings) {
+      if (!c.active) continue;
+      c.life -= dt;
+      c.vel.y -= dt * 14;
+      c.mesh.position.addScaledVector(c.vel, dt);
+      c.mesh.rotation.x += c.spin * dt;
+      c.mesh.rotation.z += c.spin * 0.5 * dt;
+      if (c.life <= 0 || c.mesh.position.y < 0) { c.active = false; c.mesh.visible = false; }
     }
 
     for (const p of this.pool) {
