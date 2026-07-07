@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GAMEPLAY } from '../config/gameplay.js';
 import { loadEquipped } from './EquippedLoader.js';
 import { createContactShadow } from '../vfx/ContactShadowFactory.js';
-import { normalizeModel, measureModel } from '../utils/measure.js';
+import { normalizeModel } from '../utils/measure.js';
 
 function extractMuzzles(socketData, equipped, type) {
   if (!socketData?.overrides) return [];
@@ -43,33 +43,17 @@ function resolveMeshGroup(model, paths) {
 }
 
 function findWheels(carModel) {
+  // SOLO mallas con nombre claro de rueda. NADA de heurísticas por tamaño/posición:
+  // los coches Tripo traen geometría fusionada con nombres genéricos, así que la
+  // heurística terminaba girando el parachoques/chasis. Si el modelo no trae
+  // ruedas nombradas (o marcadas en Modo Dev vía meshGroups.wheels), no gira nada.
   const wheels = [];
   carModel.traverse((child) => {
-    if (child.name && /wheel|tire|rueda|llanta|rim|brake|disc|rotor|cyl/i.test(child.name)) {
+    if (child.isMesh && child.name && /wheel|tire|tyre|rueda|llanta|\brim\b/i.test(child.name)) {
       wheels.push(child);
     }
   });
-  if (wheels.length === 0) {
-    // Heurística robusta: las 4 mallas más grandes en el 25% inferior del carro.
-    // measureModel evita el bbox erróneo de setFromObject en GLB de IA.
-    const box = measureModel(carModel);
-    const size = box.getSize(new THREE.Vector3());
-    const minY = box.min.y;
-    const candidates = [];
-    carModel.traverse((child) => {
-      if (!child.isMesh) return;
-      const cb = measureModel(child, carModel);
-      const c = cb.getCenter(new THREE.Vector3());
-      const s = cb.getSize(new THREE.Vector3());
-      // rueda ≈ objeto bajo, con dos dimensiones parecidas (redondo)
-      if (c.y < minY + size.y * 0.28) {
-        candidates.push({ obj: child, vol: s.x * s.y * s.z });
-      }
-    });
-    candidates.sort((a, b) => b.vol - a.vol);
-    for (const c of candidates.slice(0, 4)) wheels.push(c.obj);
-  }
-  console.log(`[PlayerVehicle] Ruedas detectadas: ${wheels.length}`, wheels.map(w => w.name || w.type));
+  console.log(`[PlayerVehicle] Ruedas detectadas por nombre: ${wheels.length}`, wheels.map(w => w.name));
   return wheels;
 }
 

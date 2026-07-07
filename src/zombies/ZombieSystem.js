@@ -160,7 +160,7 @@ export class ZombieSystem {
     // Escalonar el racimo en profundidad para que la horda tenga volumen
     z.z = GAMEPLAY.zombies.spawnZ - idx * (6 + Math.random() * 8);
     z.holder.position.set(z.x, 0, z.z);
-    z.holder.rotation.y = 0;
+    z.holder.rotation.set(0, 0, 0);
     z.holder.scale.setScalar(1);
     z.holder.visible = true;
 
@@ -215,15 +215,15 @@ export class ZombieSystem {
       }
 
       if (z.state === 'dying') {
-        // Se sigue moviendo con el flujo del mundo mientras cae/desaparece.
-        // PESO: el cuerpo se asienta en el suelo (baja el holder) para que la
-        // caída no se vea flotante.
+        // El cuerpo se DESPLOMA: se voltea al suelo con easing (peso) y se asienta,
+        // mientras el mundo lo sigue trayendo. Nada de "piernas al aire".
         z.z += worldDz;
-        if (z.dieSettle !== undefined) {
-          z.dieSettle = Math.min(1, z.dieSettle + dt * 2.2);
-          z.holder.position.y = -0.15 * z.dieSettle; // se hunde levemente al colapsar
-        }
         z.holder.position.z = z.z;
+        z.fallT = Math.min(1, z.fallT + dt / 0.42);   // cae en ~0.42s
+        const e = 1 - Math.pow(1 - z.fallT, 3);        // easeOutCubic
+        z.holder.rotation.x = z.fallDir * e * 1.45;    // se acuesta ~83°
+        z.holder.rotation.z = (z.fallYaw || 0) * e;
+        z.holder.position.y = -0.12 * e;               // se hunde levemente al colapsar
         z.dieT -= dt;
         if (z.dieT <= 0) this.recycle(i);
         continue;
@@ -334,17 +334,19 @@ export class ZombieSystem {
     if (explode) {
       z.holder.visible = false;
       z.dieT = 0.05;
-    } else if (z.actions.death) {
-      this.playAnim(z, 'death', { once: true });
-      if (z.currentAction) z.currentAction.timeScale = 1.4; // caída más rápida = con peso
-      z.dieSettle = 0;                                       // el cuerpo se asienta en el suelo
-      z.dieT = (this.clips.death?.duration || 1.6) / 1.4 + 0.7;
-    } else {
-      // sin clip de muerte → gibs de respaldo
-      this.onKill?.(z, false);
-      z.holder.visible = false;
-      z.dieT = 0.05;
+      return;
     }
+    // Muerte PROCEDURAL: el cuerpo se desploma al suelo. El clip FBX de muerte,
+    // retargeteado por nombre, distorsiona el rig (piernas al aire); un volteo
+    // controlado se ve creíble, con peso, y funciona en cualquier zombi.
+    z.mixer.stopAllAction();
+    z.animMode = 'procedural';
+    z.currentAction = null;
+    z.rig.walk(0, 0, 0.7);               // congelar en pose quieta/encorvada
+    z.fallDir = Math.random() < 0.5 ? 1 : -1;   // cae de frente o de espaldas
+    z.fallYaw = (Math.random() - 0.5) * 0.5;    // se ladea un poco
+    z.fallT = 0;
+    z.dieT = 1.5;
   }
 
   recycle(activeIndex) {
@@ -353,7 +355,7 @@ export class ZombieSystem {
     z.state = 'walk';
     z.holder.visible = false;
     z.holder.position.y = 0;
-    z.dieSettle = undefined;
+    z.holder.rotation.set(0, 0, 0);   // limpiar el volteo de la muerte
     z.mixer.stopAllAction();
     z.animMode = 'procedural';
     z.currentAction = null;

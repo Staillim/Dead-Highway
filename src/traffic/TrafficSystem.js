@@ -43,10 +43,11 @@ export class TrafficSystem {
         inner.add(model);
         holder.add(inner);
         normalizeModel(model, inner, def.len);
-        // Orientar de frente al jugador (oncoming): si es más ancho que largo, girar
+        // El tráfico AVANZA hacia +Z (viene de frente al jugador). El frente del
+        // vehículo debe apuntar a +Z (dirección de marcha), no de espaldas.
         const box = new THREE.Box3().setFromObject(inner);
         const sz = box.getSize(new THREE.Vector3());
-        inner.rotation.y = sz.x > sz.z * 1.2 ? Math.PI / 2 : 0;
+        inner.rotation.y = (sz.x > sz.z * 1.2 ? Math.PI / 2 : 0) + Math.PI;
 
         // Minivan: teñir la carrocería para variar
         if (def.tintable) {
@@ -90,8 +91,11 @@ export class TrafficSystem {
       const blocked = this.lanesBlockedNear(zWorld);
       if (blocked.size >= cfg.maxLanesBlocked || blocked.has(marker.lane)) continue;
 
-      const v = this.pool.find((p) => !p.active);
-      if (!v) continue;
+      // Elegir un vehículo libre AL AZAR (no el primero) para que aparezcan todos
+      // los tipos —ambulancias, bomberos, minivan— y no solo las primeras del pool.
+      const free = this.pool.filter((p) => !p.active);
+      if (!free.length) continue;
+      const v = free[Math.floor(Math.random() * free.length)];
 
       const lane = v.wideLanes === 2 ? Math.min(marker.lane, GAMEPLAY.lanes.count - 2) : marker.lane;
       v.active = true;

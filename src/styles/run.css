@@ -76,35 +76,58 @@
   padding: 7px 10px;
 }
 
-/* Barra de gasolina bajo el HUD superior */
+/* Indicador de combustible: pastilla compacta abajo-centro (discreto, premium) */
 #run-fuel {
   position: absolute;
-  top: calc(env(safe-area-inset-top, 0px) + 58px);
-  left: 12px;
-  right: 12px;
-  height: 10px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 10;
-  background: rgba(8, 9, 12, 0.7);
-  border: 1px solid var(--panel-border);
-  border-radius: 6px;
-  overflow: hidden;
   display: flex;
   align-items: center;
+  gap: 6px;
+  padding: 4px 9px 4px 7px;
+  background: rgba(10, 11, 15, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+#run-fuel .fuel-ico {
+  width: 13px;
+  height: 13px;
+  color: #cfd3da;
+  flex: none;
+}
+
+.fuel-track {
+  width: 88px;
+  height: 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.13);
+  overflow: hidden;
 }
 
 #run-fuel-fill {
   height: 100%;
   width: 100%;
-  background: #57c84d;
-  border-radius: 6px 0 0 6px;
-  transition: width 0.2s linear, background 0.3s;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #2f9c3c, #6fdc5a);
+  transition: width 0.25s linear, background 0.3s;
 }
 
-#run-fuel-icon {
-  position: absolute;
-  left: 6px;
-  font-size: 9px;
-  filter: drop-shadow(0 1px 1px #000);
+/* Aviso cuando queda poco: la pastilla late suavemente */
+#run-fuel.low {
+  border-color: rgba(255, 90, 71, 0.6);
+  animation: fuel-low 1s ease-in-out infinite;
+}
+
+@keyframes fuel-low {
+  0%, 100% { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); }
+  50% { box-shadow: 0 0 12px rgba(255, 70, 55, 0.55); }
 }
 
 #run-hearts .lost {

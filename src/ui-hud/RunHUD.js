@@ -28,7 +28,10 @@ export class RunHUD {
           <div class="run-chip" id="run-distance"><span id="run-distance-val">0 m</span><small>DISTANCIA</small></div>
           <div class="run-chip" id="run-speed">0 km/h</div>
         </div>
-        <div id="run-fuel"><div id="run-fuel-fill"></div><span id="run-fuel-icon">⛽</span></div>
+        <div id="run-fuel" aria-label="Combustible">
+          <svg class="fuel-ico" viewBox="0 0 24 24" fill="currentColor"><path d="M6 3h6a1 1 0 0 1 1 1v16H5V4a1 1 0 0 1 1-1zm1 2v4h4V5zm9.5 3.7L18 7.2v9.6a1.1 1.1 0 0 0 2.2 0V10a1.4 1.4 0 0 0-.5-1.1zM4 20h10v1.4H4z"/></svg>
+          <div class="fuel-track"><div id="run-fuel-fill"></div></div>
+        </div>
         <div id="run-pause" hidden>
           <div class="pause-backdrop" data-action="resume"></div>
           <div class="pause-card">
@@ -51,6 +54,7 @@ export class RunHUD {
         hearts: this.root.querySelector('#run-hearts'),
         dist: this.root.querySelector('#run-distance-val'),
         speed: this.root.querySelector('#run-speed'),
+        fuel: this.root.querySelector('#run-fuel'),
         fuelFill: this.root.querySelector('#run-fuel-fill'),
         pause: this.root.querySelector('#run-pause'),
         pauseDist: this.root.querySelector('#pause-distance'),
@@ -64,8 +68,13 @@ export class RunHUD {
   update(snapshot) {
     // La barra de gasolina sí se actualiza cada frame (suave)
     if (this.el && snapshot.fuelPct != null) {
-      this.el.fuelFill.style.width = `${snapshot.fuelPct}%`;
-      this.el.fuelFill.style.background = snapshot.fuelPct < 25 ? '#e6392e' : '#57c84d';
+      const p = snapshot.fuelPct;
+      this.el.fuelFill.style.width = `${p}%`;
+      this.el.fuelFill.style.background =
+        p < 20 ? 'linear-gradient(90deg,#c62f26,#ff6a52)'
+        : p < 45 ? 'linear-gradient(90deg,#c9871a,#f5c542)'
+        : 'linear-gradient(90deg,#2f9c3c,#6fdc5a)';
+      this.el.fuel.classList.toggle('low', p < 20);
     }
     // Texto a ~5 Hz: el DOM no necesita 60 fps
     this.acc += 1;
