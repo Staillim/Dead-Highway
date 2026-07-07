@@ -67,17 +67,16 @@ export class SpeedEffects {
       depthWrite: false,
       depthTest: false
     });
+    // Líneas de velocidad que RADIAN desde el punto de fuga y salen hacia la
+    // pantalla (efecto "warp"): nacen lejos y cerca del centro, y se abren hacia
+    // afuera mientras vienen hacia la cámara. Nada de subir en vertical.
     this.streaks = [];
-    const n = GAMEPLAY.vfx.streaks;
+    const n = GAMEPLAY.vfx.streaks * 2; // más líneas para que el efecto se lea
+    const streakGeo = new THREE.PlaneGeometry(0.03, 1.0);
     for (let i = 0; i < n; i++) {
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(0.045, 2.4 + Math.random() * 1.4), this.streakMat);
-      const side = i % 2 === 0 ? -1 : 1;
-      m.position.set(
-        side * (1.7 + Math.random() * 1.1),
-        -0.5 + Math.random() * 1.8,
-        -4
-      );
-      m.rotation.z = -side * 0.12; // apuntan levemente al centro (convergencia)
+      const m = new THREE.Mesh(streakGeo, this.streakMat);
+      m.userData.angle = Math.random() * Math.PI * 2;
+      m.userData.p = Math.random();       // progreso 0 (lejos/centro) → 1 (cerca/borde)
       this.streakGroup.add(m);
       this.streaks.push(m);
     }
@@ -140,13 +139,21 @@ export class SpeedEffects {
     this.dustGeo.getAttribute('aSize').needsUpdate = true;
     this.dustGeo.getAttribute('aAlpha').needsUpdate = true;
 
-    // Streaks: solo aparecen a alta velocidad
-    const streakK = Math.max(0, (k - 0.45) / 0.55);
-    this.streakMat.opacity = streakK * streakK * 0.32;
+    // Líneas de velocidad: aparecen a alta velocidad y SALEN hacia la pantalla
+    // (radian del centro hacia los bordes viniendo hacia la cámara).
+    const streakK = Math.min(1, Math.max(0, (k - 0.5) / 0.5)); // clamp: el boost pasa max
+    this.streakMat.opacity = streakK * 0.32;
     if (this.streakMat.opacity > 0.01) {
+      const adv = dt * (0.5 + 1.6 * streakK);
       for (const s of this.streaks) {
-        s.position.y += dt * (6 + 10 * streakK);
-        if (s.position.y > 1.6) s.position.y = -1.8 - Math.random();
+        let p = s.userData.p + adv;
+        if (p > 1) { p -= 1; s.userData.angle = Math.random() * Math.PI * 2; }
+        s.userData.p = p;
+        const a = s.userData.angle;
+        const r = 0.3 + p * p * 3.4;         // se abre acelerando hacia afuera
+        s.position.set(Math.cos(a) * r, Math.sin(a) * r, -8.5 + p * 8.6); // viene hacia la cámara
+        s.rotation.z = a - Math.PI / 2;       // el largo apunta radialmente
+        s.scale.y = 0.6 + p * 3.2;            // se estira al acercarse
       }
     }
   }

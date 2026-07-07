@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GAMEPLAY } from '../config/gameplay.js';
+import { muzzleFlashTexture, softCircleTexture } from '../vfx/SpriteTextures.js';
 
 function findMeshByPath(root, pathStr) {
   const parts = pathStr.split('/');
@@ -60,8 +61,9 @@ export class TurretSystem {
       this.pool.push({ mesh, active: false, target: null, life: 0, vel: new THREE.Vector3(), pierce: 0, explodeR: 0, dmgMul: 1, hitSet: new Set() });
     }
 
+    this._sparkTex = softCircleTexture();   // chispas redondas (no cuadros)
     this.flash = new THREE.Sprite(
-      new THREE.SpriteMaterial({ color: 0xffe08a, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })
+      new THREE.SpriteMaterial({ map: muzzleFlashTexture(), color: 0xffe08a, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })
     );
     this.flash.scale.setScalar(1.4);
     scene.add(this.flash);
@@ -86,7 +88,7 @@ export class TurretSystem {
     this.sparks = [];
     for (let i = 0; i < 14; i++) {
       const s = new THREE.Sprite(new THREE.SpriteMaterial({
-        color: 0xfff0a0, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false
+        map: this._sparkTex, color: 0xfff0a0, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false
       }));
       s.visible = false;
       s.scale.setScalar(0.6);

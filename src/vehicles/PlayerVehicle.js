@@ -57,28 +57,87 @@ function findWheels(carModel) {
   return wheels;
 }
 
+// Detecta las 4 posiciones de las ruedas HORNEADAS analizando los vértices más
+// bajos del coche por cuadrante (en el frame del `root`, unidades de mundo). Así
+// las ruedas procedurales caen EXACTO sobre las horneadas y no se solapan/duplican.
+function detectWheelAnchors(carModel) {
+  carModel.updateWorldMatrix(true, true);
+  const tmp = new THREE.Vector3();
+  const meshes = [];
+  carModel.traverse((o) => { if (o.isMesh && o.geometry?.attributes?.position) meshes.push(o); });
+  if (!meshes.length) return null;
+
+  let yMin = Infinity, yMax = -Infinity, xMax = 0;
+  const sample = (m, cb) => {
+    const pos = m.geometry.attributes.position;
+    const step = Math.max(1, Math.floor(pos.count / 4000)); // muestreo (coches de millones de tris)
+    for (let i = 0; i < pos.count; i += step) { tmp.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld); cb(); }
+  };
+  for (const m of meshes) sample(m, () => {
+    if (tmp.y < yMin) yMin = tmp.y;
+    if (tmp.y > yMax) yMax = tmp.y;
+    if (Math.abs(tmp.x) > xMax) xMax = Math.abs(tmp.x);
+  });
+
+  // Solo los vértices MÁS bajos (parche de contacto) y FUERTEMENTE outboard: así
+  // agarramos las llantas y no el chasis (que jala el promedio hacia el centro).
+  const yThresh = yMin + (yMax - yMin) * 0.16;
+  const xThresh = xMax * 0.72;
+  const q = {};
+  for (const m of meshes) sample(m, () => {
+    if (tmp.y > yThresh || Math.abs(tmp.x) < xThresh) return;
+    const key = `${tmp.x < 0 ? -1 : 1}_${tmp.z < 0 ? -1 : 1}`;
+    const e = q[key] || (q[key] = { sumX: 0, sumZ: 0, n: 0 });
+    e.sumX += tmp.x; e.sumZ += tmp.z; e.n++;
+  });
+
+  const anchors = [];
+  for (const key of Object.keys(q)) {
+    const e = q[key];
+    if (e.n >= 4) anchors.push({ x: e.sumX / e.n, z: e.sumZ / e.n });
+  }
+  return anchors.length === 4 ? { anchors, carH: yMax - yMin } : null;
+}
+
 // Los coches Tripo traen las ruedas HORNEADAS en la malla (no se pueden girar).
-// Solución: montamos 4 ruedas PROCEDURALES (llanta + rin + rayos) sobre las
-// posiciones de las ruedas, en el grupo raíz (fuera de la escala/rotación del
-// modelo), y giramos esas. Los rayos claros hacen que el giro se vea.
-function createProceduralWheels(root, width, length) {
-  const r = THREE.MathUtils.clamp(width * 0.21, 0.34, 0.62);   // radio proporcional
-  const thick = THREE.MathUtils.clamp(width * 0.16, 0.22, 0.42);
+// Solución: montamos 4 ruedas PROCEDURALES (llanta + rin + rayos) SOBRE las
+// ruedas horneadas (posición detectada), en el grupo raíz. Los rayos claros
+// hacen que el giro se vea; al caer encima, no se ve doble.
+function createProceduralWheels(root, width, length, carModel) {
+  const det = detectWheelAnchors(carModel);
+  // Radio: si detectamos altura del coche, la rueda ≈ 22% de esa altura
+  const r = det
+    ? THREE.MathUtils.clamp(det.carH * 0.22, 0.34, 0.56)
+    : THREE.MathUtils.clamp(width * 0.21, 0.34, 0.56);
+  const thick = THREE.MathUtils.clamp(width * 0.15, 0.2, 0.38);
 
   const tireGeo = new THREE.CylinderGeometry(r, r, thick, 22);
   tireGeo.rotateZ(Math.PI / 2);                     // eje del cilindro → X (izq-der)
   const tireMat = new THREE.MeshStandardMaterial({ color: 0x0e0f13, roughness: 0.88, metalness: 0.05 });
-  const hubGeo = new THREE.CylinderGeometry(r * 0.52, r * 0.52, thick * 1.06, 16);
+  const hubGeo = new THREE.CylinderGeometry(r * 0.5, r * 0.5, thick * 1.08, 16);
   hubGeo.rotateZ(Math.PI / 2);
   const hubMat = new THREE.MeshStandardMaterial({ color: 0xc2c7ce, roughness: 0.3, metalness: 0.8 });
-  const spokeGeo = new THREE.BoxGeometry(thick * 1.08, r * 0.92, r * 0.17);
+  const spokeGeo = new THREE.BoxGeometry(thick * 1.1, r * 0.9, r * 0.16);
   const spokeMat = new THREE.MeshStandardMaterial({ color: 0x808690, roughness: 0.45, metalness: 0.6 });
 
-  const xPos = width * 0.46;
-  const zFront = -length * 0.32;
-  const zRear = length * 0.30;
+  // Posiciones: de las detectadas se fuerza SIMETRÍA (los coches son simétricos)
+  // → izquierda/derecha en ±xPos y ejes delantero/trasero promediados.
+  let spots;
+  if (det) {
+    const xPos = det.anchors.reduce((s, a) => s + Math.abs(a.x), 0) / det.anchors.length;
+    const front = det.anchors.filter((a) => a.z < 0);
+    const rear = det.anchors.filter((a) => a.z >= 0);
+    const avgZ = (arr, fb) => (arr.length ? arr.reduce((s, a) => s + a.z, 0) / arr.length : fb);
+    const zF = avgZ(front, -length * 0.32);
+    const zR = avgZ(rear, length * 0.30);
+    spots = [[-xPos, zF], [xPos, zF], [-xPos, zR], [xPos, zR]];
+  } else {
+    spots = [[-width * 0.46, -length * 0.32], [width * 0.46, -length * 0.32],
+             [-width * 0.46, length * 0.30], [width * 0.46, length * 0.30]];
+  }
+
   const wheels = [];
-  for (const [sx, z] of [[-1, zFront], [1, zFront], [-1, zRear], [1, zRear]]) {
+  for (const [x, z] of spots) {
     const g = new THREE.Group();
     g.add(new THREE.Mesh(tireGeo, tireMat));
     g.add(new THREE.Mesh(hubGeo, hubMat));
@@ -86,7 +145,7 @@ function createProceduralWheels(root, width, length) {
     const s2 = new THREE.Mesh(spokeGeo, spokeMat);
     s2.rotation.x = Math.PI / 2;                     // cruz de rayos en la cara
     g.add(s1, s2);
-    g.position.set(sx * xPos, r, z);
+    g.position.set(x, r, z);
     g.traverse((o) => { o.frustumCulled = false; });
     root.add(g);
     wheels.push(g);
@@ -143,7 +202,7 @@ export class PlayerVehicle {
     let proceduralWheels = null;
     let pwRadius = GAMEPLAY.vehicle.wheelRadius;
     if (wheelMeshes.length === 0) {
-      const pw = createProceduralWheels(root, w, l);
+      const pw = createProceduralWheels(root, w, l, carModel);
       proceduralWheels = pw.wheels;
       pwRadius = pw.radius;
     }

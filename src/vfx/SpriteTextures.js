@@ -48,6 +48,40 @@ export function streakTexture(w = 16, h = 128) {
   return new THREE.CanvasTexture(c);
 }
 
+// Fogonazo de disparo: núcleo brillante + rayos (star burst). Reemplaza el
+// "cuadro" feo del sprite plano.
+export function muzzleFlashTexture(size = 128) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  const cx = size / 2, cy = size / 2;
+  const core = ctx.createRadialGradient(cx, cy, 1, cx, cy, size * 0.3);
+  core.addColorStop(0, 'rgba(255,255,255,1)');
+  core.addColorStop(0.45, 'rgba(255,240,180,0.85)');
+  core.addColorStop(1, 'rgba(255,200,90,0)');
+  ctx.fillStyle = core;
+  ctx.fillRect(0, 0, size, size);
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.globalCompositeOperation = 'lighter';
+  const spikes = 6;
+  for (let i = 0; i < spikes; i++) {
+    ctx.rotate((Math.PI * 2) / spikes + 0.2);
+    const g = ctx.createLinearGradient(0, 0, size * 0.5, 0);
+    g.addColorStop(0, 'rgba(255,238,175,0.95)');
+    g.addColorStop(1, 'rgba(255,200,90,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(0, -size * 0.028);
+    ctx.lineTo(size * 0.5, 0);
+    ctx.lineTo(0, size * 0.028);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+  return new THREE.CanvasTexture(c);
+}
+
 export function smokeColumnTexture(w = 64, h = 256) {
   const c = document.createElement('canvas');
   c.width = w;
