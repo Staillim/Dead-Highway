@@ -15,15 +15,21 @@ const TYPE_URLS = {
 // El mundo los trae hacia el carro; cada uno suma su locomoción y se dirige al
 // carril del jugador. La torreta los mata; los que llegan al carro hacen daño.
 export class ZombieSystem {
-  constructor(scene, { onKill, onFatExplode, onReachCar, onDeath } = {}) {
+  constructor(scene, { onKill, onFatExplode, onReachCar, onDeath, onWave } = {}) {
     this.scene = scene;
     this.onKill = onKill;         // (zombie) → gibs
     this.onFatExplode = onFatExplode; // (x, z) → onda + daño en área
     this.onReachCar = onReachCar; // (zombie) → daño al carro / latch
     this.onDeath = onDeath;       // (zombie) → contador de kills (misiones/eventos)
+    this.onWave = onWave;         // (n) → aviso de nueva oleada (HUD)
     this.pool = [];
     this.active = [];
-    this.waveTimer = 2;
+    // Estado de oleadas: arranca con una calma corta antes de la 1ª oleada
+    this.waveNum = 0;
+    this.wavePhase = 'calm';
+    this.phaseTimer = 2.5;
+    this.spawnTimer = 0;
+    this.diff = 0;
     this.tmp = new THREE.Vector3();
   }
 
@@ -187,21 +193,34 @@ export class ZombieSystem {
   }
 
   update(dt, worldDz, speed, laneSystem, distance) {
-    // Oleadas: grupos de zombis con separación creciente por distancia
-    this.waveTimer -= dt;
-    if (this.waveTimer <= 0) {
-      const zc = GAMEPLAY.zombies;
-      const densify = Math.min(1, distance / 5000);
-      this.waveTimer = zc.waveMinS + Math.random() * (zc.waveMaxS - zc.waveMinS) * (1 - densify * 0.5);
-      // Racimo repartido en carriles y profundidad para que se vea la horda
-      const burst = 3 + Math.floor(Math.random() * 3) + Math.floor(densify * 3);
-      for (let i = 0; i < burst; i++) {
-        this.spawn(distance, laneSystem, i, burst);
+    const zc = GAMEPLAY.zombies;
+    this.diff = Math.min(1, distance / zc.diffDistance); // curva de dificultad 0..1
+
+    // OLEADAS: alterna fase de ATAQUE (ráfagas densas) y CALMA. Con la distancia
+    // las oleadas duran más, la calma menos y las ráfagas crecen.
+    this.phaseTimer -= dt;
+    if (this.phaseTimer <= 0) {
+      if (this.wavePhase === 'calm') {
+        this.wavePhase = 'wave';
+        this.waveNum++;
+        this.phaseTimer = zc.waveDurS[0] + this.diff * (zc.waveDurS[1] - zc.waveDurS[0]);
+        this.spawnTimer = 0;
+        this.onWave?.(this.waveNum);
+      } else {
+        this.wavePhase = 'calm';
+        this.phaseTimer = zc.calmDurS[1] - this.diff * (zc.calmDurS[1] - zc.calmDurS[0]);
+      }
+    }
+    if (this.wavePhase === 'wave') {
+      this.spawnTimer -= dt;
+      if (this.spawnTimer <= 0) {
+        this.spawnTimer = zc.waveSpawnS[0] + Math.random() * (zc.waveSpawnS[1] - zc.waveSpawnS[0]) * (1 - this.diff * 0.5);
+        const burst = zc.burstBase + Math.floor(this.diff * zc.burstMax) + Math.floor(Math.random() * 2);
+        for (let i = 0; i < burst; i++) this.spawn(distance, laneSystem, i, burst);
       }
     }
 
     const despawnZ = GAMEPLAY.zombies.despawnZ;
-    const zc = GAMEPLAY.zombies;
     for (let i = this.active.length - 1; i >= 0; i--) {
       const z = this.active[i];
 
@@ -267,7 +286,7 @@ export class ZombieSystem {
         z.holder.rotation.y = z.wanderAngle; // mira hacia donde camina
       } else {
         // PERSIGUE: se dirige al carril del carro y lo encara
-        const velMul = z.crawler ? 0.6 : 1;
+        const velMul = (z.crawler ? 0.6 : 1) * (1 + this.diff * GAMEPLAY.zombies.speedRamp);
         const homingMul = z.crawler ? 0.6 : 1;
         z.z += worldDz + z.cfg.ownVel * dt * velMul;
         const homing = z.cfg.homingX * dt * homingMul;
@@ -376,7 +395,11 @@ export class ZombieSystem {
       z.currentAction = null;
     }
     this.active.length = 0;
-    this.waveTimer = 2;
+    this.waveNum = 0;
+    this.wavePhase = 'calm';
+    this.phaseTimer = 2.5;
+    this.spawnTimer = 0;
+    this.diff = 0;
   }
 }
 

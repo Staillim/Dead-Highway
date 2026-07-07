@@ -16,8 +16,11 @@ const MODELS = [
   { url: '/models/traffic/minivan.glb', len: 4.6, count: 4, tintable: true }
 ];
 
-// Colores para las variantes de minivan (un solo modelo → varias)
-const MINIVAN_TINTS = [0xd23b3b, 0x2e6fd2, 0x2fae54, 0xe0b52e, 0xdedede, 0x8a3fd0];
+// Paleta de tintes para dar VARIEDAD de color al tráfico (cada vehículo distinto)
+const TRAFFIC_TINTS = [
+  0xd23b3b, 0x2e6fd2, 0x2fae54, 0xe0b52e, 0xdedede, 0x8a3fd0,
+  0xe8722a, 0x18a89a, 0xb03050, 0x3a4a5a, 0xf0f0f0, 0x6b8e23
+];
 
 export class TrafficSystem {
   constructor(scene, { onCrash } = {}) {
@@ -49,17 +52,19 @@ export class TrafficSystem {
         const sz = box.getSize(new THREE.Vector3());
         inner.rotation.y = (sz.x > sz.z * 1.2 ? Math.PI / 2 : 0) + Math.PI;
 
-        // Minivan: teñir la carrocería para variar
-        if (def.tintable) {
-          const tint = new THREE.Color(MINIVAN_TINTS[this.tintIdx % MINIVAN_TINTS.length]);
-          this.tintIdx++;
-          model.traverse((o) => {
-            if (o.isMesh && o.material) {
-              o.material = o.material.clone();
-              o.material.color.lerp(tint, 0.6);
-            }
-          });
-        }
+        // Tinte de color + acabado semi-metálico para que la carretera tenga
+        // vehículos variados y con mejor terminación (no planos/apagados).
+        const tint = new THREE.Color(TRAFFIC_TINTS[this.tintIdx % TRAFFIC_TINTS.length]);
+        this.tintIdx += (this.tintIdx % 2) + 1; // salta para no repetir patrón
+        const strength = def.tintable ? 0.6 : 0.3; // minivan más fuerte; resto sutil
+        model.traverse((o) => {
+          if (o.isMesh && o.material) {
+            o.material = o.material.clone();
+            o.material.color.lerp(tint, strength);
+            if (o.material.metalness !== undefined) o.material.metalness = Math.min(1, (o.material.metalness || 0) + 0.25);
+            if (o.material.roughness !== undefined) o.material.roughness = Math.max(0.28, (o.material.roughness ?? 0.7) - 0.12);
+          }
+        });
 
         holder.visible = false;
         this.scene.add(holder);

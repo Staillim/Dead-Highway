@@ -114,7 +114,16 @@ export const GAMEPLAY = {
     spawnZ: -120,          // dónde nacen (adelante)
     despawnZ: 30,          // detrás del carro → reciclar
     height: 1.7,           // altura objetivo (un poco más grandes, ~tamaño coche)
-    waveMinS: 1.5,         // intervalo entre spawns dentro de una oleada
+    // OLEADAS: alternan fase de ataque (spawns densos) y calma. Con la distancia
+    // las oleadas duran más, la calma menos y las ráfagas son mayores (dificultad).
+    waveDurS: [7, 15],     // duración de la oleada [inicio, tope por dificultad]
+    calmDurS: [3, 6],      // duración de la calma [tope por dificultad, inicio]
+    waveSpawnS: [0.9, 2.0],// intervalo entre ráfagas DENTRO de una oleada
+    burstBase: 3,          // zombis por ráfaga (base)
+    burstMax: 6,           // extra por dificultad
+    speedRamp: 0.45,       // +45% de velocidad propia al máximo de dificultad
+    diffDistance: 6000,    // metros para llegar a dificultad máxima
+    waveMinS: 1.5,         // (legacy)
     waveMaxS: 3.0,
     crawlChance: 0.12,     // pocos se arrastran (no todos)
     screamChance: 0.35,    // solo algunos gritan al ver el coche

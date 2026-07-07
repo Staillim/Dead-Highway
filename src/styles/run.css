@@ -177,6 +177,43 @@
   100% { transform: scale(1); }
 }
 
+/* Banner de oleada — aparece un momento en el centro */
+#run-wave {
+  position: absolute;
+  top: 24%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 12;
+  text-align: center;
+  pointer-events: none;
+  color: #ff5a4e;
+}
+#run-wave span {
+  display: block;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 5px;
+  color: #fff;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+#run-wave b {
+  display: block;
+  font-size: 52px;
+  font-weight: 900;
+  line-height: 0.9;
+  text-shadow: 0 3px 12px rgba(0, 0, 0, 0.6), 0 0 24px rgba(255, 70, 60, 0.6);
+}
+#run-wave.show {
+  animation: wave-in 1.8s ease forwards;
+}
+@keyframes wave-in {
+  0% { opacity: 0; transform: translateX(-50%) scale(0.7); }
+  15% { opacity: 1; transform: translateX(-50%) scale(1.05); }
+  25% { transform: translateX(-50%) scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 /* Indicador de combustible: pastilla compacta abajo-centro (discreto, premium) */
 #run-fuel {
   position: absolute;

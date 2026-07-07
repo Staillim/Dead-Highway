@@ -180,7 +180,8 @@ export class RunScene {
       onKill: (z, gibbed) => this.gibs.burst(z.x, 0.8, z.z, z.cfg.tint, gibbed ? 8 : 5),
       onFatExplode: (x, z, cfg) => this.onFatExplode(x, z, cfg),
       onReachCar: (z) => this.tryLatch(z),
-      onDeath: (z) => this.registerKill(z)
+      onDeath: (z) => this.registerKill(z),
+      onWave: (n) => this.hud?.notifyWave?.(n)
     });
     await this.zombies.load();
     this.turret = new TurretSystem(this.scene, this.vehicle, this.zombies, {

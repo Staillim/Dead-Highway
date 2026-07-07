@@ -32,6 +32,7 @@ export class RunHUD {
         </div>
         <div id="run-score"><b id="run-score-val">0</b><span>PUNTOS</span></div>
         <div id="run-combo" hidden><b id="run-combo-mult">x2</b><span>COMBO</span></div>
+        <div id="run-wave" hidden><span>OLEADA</span><b id="run-wave-n">1</b></div>
         <div id="run-fuel" aria-label="Combustible">
           <svg class="fuel-ico" viewBox="0 0 24 24" fill="currentColor"><path d="M6 3h6a1 1 0 0 1 1 1v16H5V4a1 1 0 0 1 1-1zm1 2v4h4V5zm9.5 3.7L18 7.2v9.6a1.1 1.1 0 0 0 2.2 0V10a1.4 1.4 0 0 0-.5-1.1zM4 20h10v1.4H4z"/></svg>
           <div class="fuel-track"><div id="run-fuel-fill"></div></div>
@@ -65,6 +66,8 @@ export class RunHUD {
         score: this.root.querySelector('#run-score-val'),
         combo: this.root.querySelector('#run-combo'),
         comboMult: this.root.querySelector('#run-combo-mult'),
+        wave: this.root.querySelector('#run-wave'),
+        waveN: this.root.querySelector('#run-wave-n'),
         dist: this.root.querySelector('#run-distance-val'),
         speed: this.root.querySelector('#run-speed'),
         fuel: this.root.querySelector('#run-fuel'),
@@ -117,6 +120,18 @@ export class RunHUD {
       void this.el.hearts.offsetWidth;
       this.el.hearts.classList.add('hit');
     }
+  }
+
+  // Banner de nueva oleada (aparece un momento y se va)
+  notifyWave(n) {
+    if (!this.el?.wave) return;
+    this.el.waveN.textContent = n;
+    this.el.wave.hidden = false;
+    this.el.wave.classList.remove('show');
+    void this.el.wave.offsetWidth;
+    this.el.wave.classList.add('show');
+    clearTimeout(this._waveT);
+    this._waveT = setTimeout(() => { if (this.el?.wave) this.el.wave.hidden = true; }, 1800);
   }
 
   // Combo/score: actualiza los puntos y el popup de multiplicador
