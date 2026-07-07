@@ -163,9 +163,14 @@ export class ZombieSystem {
     z.holder.scale.setScalar(1);
     z.holder.visible = true;
 
-    // Comportamiento: algunos se arrastran; el resto está "idle" hasta ver el
-    // coche (grita = scream) y recién ahí corre. Los gordos no gritan.
+    // Reset del tinte de impacto (evita zombis que quedan rojos al reciclarse)
+    z.hitFlash = 0;
+    z.model.traverse((o) => { if (o.isMesh) o.material.emissive?.setHex(0x000000); });
+
+    // Comportamiento: pocos se arrastran; algunos gritan al ver el coche; el
+    // resto simplemente camina. Los gordos no gritan ni se arrastran.
     z.crawler = z.type !== 'fat' && Math.random() < GAMEPLAY.zombies.crawlChance && !!z.actions.crawl;
+    z.willScream = z.type !== 'fat' && !z.crawler && Math.random() < GAMEPLAY.zombies.screamChance && !!z.actions.scream;
     z.screamed = false;
     z.screaming = false;
     z.screamT = 0;
@@ -197,9 +202,21 @@ export class ZombieSystem {
       // El mixer siempre avanza (mueve los huesos cuando hay clip FBX activo)
       z.mixer.update(dt);
 
+      // Quitar el tinte rojo de impacto cuando pasa el flash
+      if (z.hitFlash > 0) {
+        z.hitFlash -= dt;
+        if (z.hitFlash <= 0) z.model.traverse((o) => { if (o.isMesh) o.material.emissive?.setHex(0x000000); });
+      }
+
       if (z.state === 'dying') {
-        // Se sigue moviendo con el flujo del mundo mientras cae/desaparece
+        // Se sigue moviendo con el flujo del mundo mientras cae/desaparece.
+        // PESO: el cuerpo se asienta en el suelo (baja el holder) para que la
+        // caída no se vea flotante.
         z.z += worldDz;
+        if (z.dieSettle !== undefined) {
+          z.dieSettle = Math.min(1, z.dieSettle + dt * 2.2);
+          z.holder.position.y = -0.15 * z.dieSettle; // se hunde levemente al colapsar
+        }
         z.holder.position.z = z.z;
         z.dieT -= dt;
         if (z.dieT <= 0) this.recycle(i);
@@ -212,10 +229,10 @@ export class ZombieSystem {
 
       const dx = laneSystem.x - z.x;
 
-      // Visión: si aún no gritó y el coche entra en su rango → SCREAM y luego corre
-      if (!z.screamed && !z.crawler && !z.screaming && Math.abs(z.z) < zc.detectZ && z.actions.scream) {
+      // Visión: si le toca gritar y el coche entra en su rango → SCREAM y corre
+      if (z.willScream && !z.screamed && !z.screaming && Math.abs(z.z) < zc.detectZ) {
         z.screaming = true;
-        z.screamT = (this.clips.scream?.duration || 1) * 0.75;
+        z.screamT = (this.clips.scream?.duration || 1) * 0.7;
         this.playAnim(z, 'scream', { once: true });
       }
 
@@ -228,8 +245,8 @@ export class ZombieSystem {
         if (z.screamT <= 0) { z.screaming = false; z.screamed = true; this.playAnim(z, 'procedural'); }
       } else if (z.crawler) {
         homingMul = 0.6; velMul = 0.55;
-      } else if (!z.screamed) {
-        homingMul = zc.screamHomingMul; velMul = zc.screamHomingMul;
+      } else if (z.willScream && !z.screamed) {
+        homingMul = zc.screamHomingMul; velMul = zc.screamHomingMul; // acecha lento antes de gritar
       }
 
       // Movimiento: el mundo lo trae + su locomoción propia; se dirige al carril
@@ -298,7 +315,9 @@ export class ZombieSystem {
       z.dieT = 0.05;
     } else if (z.actions.death) {
       this.playAnim(z, 'death', { once: true });
-      z.dieT = (this.clips.death?.duration || 1.6) + 0.6; // cae y descansa un momento
+      if (z.currentAction) z.currentAction.timeScale = 1.4; // caída más rápida = con peso
+      z.dieSettle = 0;                                       // el cuerpo se asienta en el suelo
+      z.dieT = (this.clips.death?.duration || 1.6) / 1.4 + 0.7;
     } else {
       // sin clip de muerte → gibs de respaldo
       this.onKill?.(z, false);
@@ -312,6 +331,8 @@ export class ZombieSystem {
     z.active = false;
     z.state = 'walk';
     z.holder.visible = false;
+    z.holder.position.y = 0;
+    z.dieSettle = undefined;
     z.mixer.stopAllAction();
     z.animMode = 'procedural';
     z.currentAction = null;

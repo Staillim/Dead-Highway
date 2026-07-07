@@ -14,6 +14,7 @@ import { Atmosphere } from '../environment/Atmosphere.js';
 import { AmbientEvents } from '../environment/AmbientEvents.js';
 import { Tumbleweeds } from '../environment/Tumbleweeds.js';
 import { ObstacleSystem } from '../obstacles/ObstacleSystem.js';
+import { TrafficSystem } from '../traffic/TrafficSystem.js';
 import { ZombieSystem } from '../zombies/ZombieSystem.js';
 import { TurretSystem } from '../turrets/TurretSystem.js';
 import { HoodWeaponSystem } from '../turrets/HoodWeaponSystem.js';
@@ -95,13 +96,15 @@ export class RunScene {
     // --- Capas del mundo ---
     this.sky = new SkyDome(this.scene);
     this.far = new FarBackdrop(this.scene);
-    // Fase 2: cada chunk reciclado ofrece sus markers al spawner de obstáculos
+    // Obstáculos (bus ocasional) + TRÁFICO en contravía (hazard principal)
     this.obstacles = new ObstacleSystem(this.scene);
+    this.traffic = new TrafficSystem(this.scene, { onCrash: () => this.onCrash() });
     this.road = new RoadSystem(this.scene, renderer, {
       debug: DEBUG,
-      onChunkRecycled: (chunk) => this.obstacles.maybeSpawn(chunk)
+      onChunkRecycled: (chunk) => { this.obstacles.maybeSpawn(chunk); this.traffic.maybeSpawn(chunk); }
     });
     await this.obstacles.load();
+    await this.traffic.load();
     this.hp = GAMEPLAY.obstacles.hp;
     this.mid = new MidProps(this.scene);
     this.near = new NearProps(this.scene);
@@ -212,6 +215,7 @@ export class RunScene {
     this.speedFx.reset();
     this.tumbleweeds.reset();
     this.obstacles.reset();
+    this.traffic.reset();
     // Soltar zombis agarrados del carro antes de reciclar
     for (const z of this.latched) this.vehicle.object3D.remove(z.holder);
     this.latched.length = 0;
@@ -399,9 +403,11 @@ export class RunScene {
       this.vehicle.update(dt, this.laneSystem, speed);
       this.road.update(dt, speed);
 
-      // Obstáculos: avanzar y detectar golpe contra el carro
+      // Obstáculos (bus) + tráfico en contravía: avanzar y detectar choques
       const hit = this.obstacles.update(speed * dt, this.laneSystem);
       if (hit) this.onCrash();
+      const tc = this.traffic.update(dt, speed, this.laneSystem);
+      if (tc) this.onCrash();
 
       // Zombis + combate (el mundo los trae; la torreta los mata; los gibs vuelan)
       this.zombies.update(dt, speed * dt, speed, this.laneSystem, this.controller.distance);

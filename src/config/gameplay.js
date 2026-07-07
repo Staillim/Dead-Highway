@@ -96,8 +96,8 @@ export const GAMEPLAY = {
   // Fase 2: obstáculos en carriles (consumen los spawnMarkers de cada chunk)
   obstacles: {
     hp: 3,                 // vidas del carro
-    spawnChance: 0.8,      // probabilidad de usar cada marker al reciclar chunk
-    busChance: 0.22,       // de los spawns, cuántos son bus escolar
+    spawnChance: 0.25,     // pocos wrecks estáticos (el hazard principal es el tráfico)
+    busChance: 0.7,        // de esos pocos, mayormente el bus atravesado
     busAcrossChance: 0.5,  // bus atravesado (2 carriles) vs alineado (1 carril)
     minGapZ: 34,           // separación mínima en Z entre obstáculos (que siempre haya escape)
     maxLanesBlocked: 3,    // nunca bloquear los 4 carriles en la misma franja de Z
@@ -115,9 +115,10 @@ export const GAMEPLAY = {
     height: 1.7,           // altura objetivo (un poco más grandes, ~tamaño coche)
     waveMinS: 1.5,         // intervalo entre spawns dentro de una oleada
     waveMaxS: 3.0,
-    crawlChance: 0.2,      // fracción que aparece arrastrándose (anim crawl)
-    detectZ: 75,           // a esta distancia el zombi ve el coche y grita (scream)
-    screamHomingMul: 0.3,  // antes de gritar avanza lento; tras gritar, a tope
+    crawlChance: 0.12,     // pocos se arrastran (no todos)
+    screamChance: 0.35,    // solo algunos gritan al ver el coche
+    detectZ: 70,           // a esta distancia el zombi ve el coche y grita (scream)
+    screamHomingMul: 0.45, // antes de gritar avanza lento; tras gritar, a tope
     // curva de dificultad GDD §9: qué tipos según distancia
     unlock: { runner: 500, fat: 1500 },
     types: {
@@ -125,6 +126,16 @@ export const GAMEPLAY = {
       runner: { hp: 1, ownVel: 8.0, homingX: 5.0, scale: 0.92, tint: 0xa8815a, run: 1.6, dmg: 1 },
       fat: { hp: 4, ownVel: -4.0, homingX: 0.8, scale: 1.25, tint: 0x74855a, run: 0.4, dmg: 2, explodeR: 5 }
     }
+  },
+
+  // Tráfico EN CONTRAVÍA: coches normales que vienen de frente (el jugador va al
+  // revés). Vienen del horizonte y cierran rápido; hay que esquivarlos.
+  traffic: {
+    spawnChance: 0.6,
+    minGapZ: 40,
+    maxLanesBlocked: 2,    // nunca tapar todos los carriles con tráfico
+    oncomingSpeed: 9,      // m/s adicionales sobre el flujo del mundo
+    hitDepth: 2.4
   },
 
   // Torreta automática (GDD §5): apunta al zombi más cercano en rango y dispara sola
