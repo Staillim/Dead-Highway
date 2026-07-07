@@ -25,6 +25,7 @@ import { SpeedEffects } from '../vfx/SpeedEffects.js';
 import { RunHUD } from '../ui-hud/RunHUD.js';
 import { PlayerState } from '../save/PlayerState.js';
 import { computeUpgradeStats } from '../save/UpgradeStats.js';
+import { awardRunRewards } from '../save/Rewards.js';
 
 const DEBUG = new URLSearchParams(location.search).has('debug');
 
@@ -256,6 +257,7 @@ export class RunScene {
     this.explosions.reset();
     this.applyUpgrades(); // reaplicar mejoras (pudieron cambiar en el garaje)
     if (this.state.equipped?.turretColor) this.turret.applyColor(this.state.equipped.turretColor);
+    this._ended = false;
     this.vehicle.reset();
 
     if (equipped && equipped.carId !== this.vehicle.equippedCarId) {
@@ -410,6 +412,8 @@ export class RunScene {
   }
 
   endRun() {
+    if (this._ended) return; // evitar doble fin (sin gas + 0 hp)
+    this._ended = true;
     // Persistir progreso de la corrida en el estado del jugador
     const dist = Math.round(this.controller.distance);
     const stats = this.state.stats || { bestDistance: 0, lastDistance: 0, runsPlayed: 0 };
@@ -417,6 +421,8 @@ export class RunScene {
     stats.bestDistance = Math.max(stats.bestDistance, dist);
     stats.runsPlayed += 1;
     this.state.stats = stats;
+    // Recompensas: monedas, gemas y XP de pase de batalla
+    this.lastRewards = awardRunRewards(this.state, dist);
     PlayerState.save(this.state);
     this.onExit?.();
   }

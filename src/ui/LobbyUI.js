@@ -87,6 +87,25 @@ export class LobbyUI {
     requestAnimationFrame(() => this.positionToast());
   }
 
+  // Refresca recursos y pase de batalla tras una carrera (cambian las monedas/XP)
+  refreshResources() {
+    const s = this.state;
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('res-coins', fmt(s.coins));
+    set('res-gems', fmt(s.gems));
+    set('res-fuel', `${s.fuel}%`);
+    set('power-value', fmt(s.power));
+    const bp = s.battlePass;
+    if (bp) {
+      const fill = document.querySelector('.pass-fill');
+      if (fill) fill.style.width = `${Math.round((bp.xp / bp.maxXp) * 100)}%`;
+      const badge = document.querySelector('.pass-badge');
+      if (badge) badge.textContent = bp.level;
+      const label = document.querySelector('.pass-label');
+      if (label) label.textContent = `${fmt(bp.xp)} / ${fmt(bp.maxXp)}`;
+    }
+  }
+
   positionToast() {
     const toast = document.getElementById('toast');
     if (!toast) return;

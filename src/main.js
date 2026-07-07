@@ -38,17 +38,18 @@ async function init() {
   });
   scenes.register('lobby', () => lobby);
 
+  let ui;
   // La escena de partida se carga perezosa: el lobby arranca ligero
   scenes.register('run', async () => {
     const { RunScene } = await import('./scenes/RunScene.js');
     return new RunScene({
       engine,
       state,
-      onExit: () => scenes.switchTo('lobby')
+      onExit: async () => { await scenes.switchTo('lobby'); ui?.refreshResources(); }
     });
   });
 
-  const ui = new LobbyUI({
+  ui = new LobbyUI({
     state,
     onViewChange: (view) => lobby.setStageView(view),
     onPlay: () => scenes.switchTo('run', { equipped: buildEquipped(state, discovered) }),
