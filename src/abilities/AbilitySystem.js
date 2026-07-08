@@ -80,11 +80,9 @@ export class AbilitySystem {
       ix = best.x;
       iz = best.z;
     }
-    this.killInRadius(ix, iz, a.radius, a.damage);
-    // Onda visual (bola + réplica) para que se lea el área de la explosión
-    this.explosions?.boom(ix, iz);
-    this.explosions?.boom(ix + (Math.random() - 0.5) * a.radius, iz + (Math.random() - 0.5) * a.radius);
-    this.onMissile?.(ix, iz);
+    // El MISIL se VE lanzarse: RunScene dispara el proyectil y detona AL IMPACTO
+    // (killInRadius + explosión en onArrive). Guardamos radio/daño para el caller.
+    this.onMissile?.(ix, iz, a.radius, a.damage);
   }
 
   // EMP: pulso en toda la pantalla. Mata a una fracción y aturde (congela) al resto;

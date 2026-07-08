@@ -114,7 +114,10 @@ export const GAMEPLAY = {
     poolPerType: 9,        // instancias por tipo en el pool (~27 total)
     spawnZ: -120,          // dónde nacen (adelante)
     despawnZ: 30,          // detrás del carro → reciclar
-    height: 1.7,           // altura objetivo (un poco más grandes, ~tamaño coche)
+    height: 1.95,          // altura objetivo (más grandes, imponentes)
+    eliteChance: 0.22,     // fracción de zombis "élite": más grandes y con más vida
+    eliteHpMul: 1.9,       // vida extra de los élite
+    eliteScale: 1.2,       // qué tan más grandes son los élite
     // OLEADAS: alternan fase de ataque (spawns densos) y calma. Con la distancia
     // las oleadas duran más, la calma menos y las ráfagas son mayores (dificultad).
     waveDurS: [7, 15],     // duración de la oleada [inicio, tope por dificultad]

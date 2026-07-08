@@ -27,7 +27,14 @@ const dayIndex = (now) => Math.floor(now / DAY_MS);
 export function ensureDailyMissions(state, now = Date.now()) {
   const di = dayIndex(now);
   const cur = state.missions;
-  if (cur && cur.dayIndex === di && Array.isArray(cur.items) && cur.items.length) return cur;
+  if (cur && cur.dayIndex === di && Array.isArray(cur.items) && cur.items.length) {
+    // Cualquier misión ya reclamada (incl. heredadas de sesiones previas) se
+    // reemplaza por otra nueva: el mazo siempre muestra misiones activas.
+    for (let i = 0; i < cur.items.length; i++) {
+      if (cur.items[i].claimed) cur.items[i] = rollReplacement(state, now);
+    }
+    return cur;
+  }
 
   const pool = [...MISSION_POOL];
   let seed = (di * 2654435761) % 2147483647;
@@ -61,15 +68,35 @@ export function applyRunToMissions(state, run) {
   return m;
 }
 
-// Reclama la recompensa de una misión completada. Devuelve el premio o null.
+// Arma una misión NUEVA (progreso 0) con una plantilla que no esté ya activa,
+// para que al reclamar aparezca "otra en su lugar". Determinista por
+// (día + nº de reemplazos) → estable si se recarga la página.
+function rollReplacement(state, now = Date.now()) {
+  const m = state.missions;
+  const activeKeys = new Set(m.items.map((x) => x.key));
+  let candidates = MISSION_POOL.filter((p) => !activeKeys.has(p.key));
+  if (!candidates.length) candidates = MISSION_POOL;
+  m.rollCount = (m.rollCount || 0) + 1;
+  let seed = ((dayIndex(now) + 3) * 2654435761 + m.rollCount * 40503) % 2147483647;
+  seed = Math.abs(seed);
+  const p = candidates[seed % candidates.length];
+  return { key: p.key, type: p.type, goal: p.goal, reward: p.reward, desc: p.text(p.goal), progress: 0, claimed: false };
+}
+
+// Reclama la recompensa de una misión completada, y la REEMPLAZA por otra nueva
+// en el mismo hueco. Devuelve { reward, newItem } o null si no se puede reclamar.
 export function claimMission(state, key) {
   const m = ensureDailyMissions(state);
-  const it = m.items.find((x) => x.key === key);
-  if (!it || it.claimed || it.progress < it.goal) return null;
-  it.claimed = true;
-  state.coins = (state.coins || 0) + (it.reward.coins || 0);
-  state.gems = (state.gems || 0) + (it.reward.gems || 0);
-  return it.reward;
+  const idx = m.items.findIndex((x) => x.key === key);
+  if (idx < 0) return null;
+  const it = m.items[idx];
+  if (it.claimed || it.progress < it.goal) return null;
+  const reward = it.reward;
+  state.coins = (state.coins || 0) + (reward.coins || 0);
+  state.gems = (state.gems || 0) + (reward.gems || 0);
+  const newItem = rollReplacement(state);
+  m.items[idx] = newItem; // aparece otra misión en su lugar
+  return { reward, newItem };
 }
 
 // Misiones completas y sin reclamar (para el badge del menú)

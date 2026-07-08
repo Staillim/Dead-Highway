@@ -159,7 +159,13 @@ export class ZombieSystem {
     z.active = true;
     z.dead = false;
     z.state = 'walk';
+    // Élite: algunos zombis (no los gordos, ya tanque) salen más grandes y con
+    // bastante más vida → variedad y "mini-jefes" que aguantan la ráfaga.
+    z.elite = z.type !== 'fat' && Math.random() < GAMEPLAY.zombies.eliteChance;
     z.hp = z.cfg.hp;
+    // Además, pequeña variación de vida por instancia (±1) para que no todos caigan igual.
+    if (!z.elite && Math.random() < 0.35) z.hp += 1;
+    if (z.elite) z.hp = Math.ceil(z.cfg.hp * GAMEPLAY.zombies.eliteHpMul) + 1;
     z.phase = Math.random() * Math.PI * 2;
     z.lane = Math.floor(Math.random() * GAMEPLAY.lanes.count);
     z.x = laneCenterX(z.lane) + (Math.random() - 0.5) * 1.5;
@@ -167,7 +173,7 @@ export class ZombieSystem {
     z.z = GAMEPLAY.zombies.spawnZ - idx * (6 + Math.random() * 8);
     z.holder.position.set(z.x, 0, z.z);
     z.holder.rotation.set(0, 0, 0);
-    z.holder.scale.setScalar(1);
+    z.holder.scale.setScalar(z.elite ? GAMEPLAY.zombies.eliteScale : 1);
     z.holder.visible = true;
 
     // Reset del tinte de impacto (evita zombis que quedan rojos al reciclarse)

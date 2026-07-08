@@ -11,7 +11,7 @@ import { GAMEPLAY, laneCenterX } from '../config/gameplay.js';
 const PICKUPS = {
   poolPerKind: { coin: 12, gem: 3, medkit: 3 },
   spawnEveryS: [1.4, 3.0],           // intervalo entre tandas
-  weights: { coin: 0.74, gem: 0.10, medkit: 0.16 }, // probabilidad de cada tanda
+  weights: { coin: 0.82, gem: 0.13, medkit: 0.05 }, // vidas MUY escasas en carretera
   coinRun: [3, 6],                   // monedas seguidas en una fila
   coinGapZ: 4.5,                     // separación en Z dentro de la fila
   spinSpeed: 2.4,                    // giro (rad/s)

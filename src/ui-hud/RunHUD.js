@@ -28,11 +28,11 @@ export class RunHUD {
           <div class="hud-group">
             <button id="run-pause-btn" aria-label="Pausa">${PAUSE_ICON}</button>
             <div class="run-chip" id="run-hearts">❤❤❤</div>
-            <div class="run-chip" id="run-score"><b id="run-score-val">0</b><small>PTS</small></div>
           </div>
-          <div class="run-chip" id="run-distance"><span id="run-distance-val">0 m</span><small>DISTANCIA</small></div>
-          <div class="run-chip" id="run-speed"><b id="run-speed-val">0</b><small>KM/H</small></div>
+          <div class="run-chip" id="run-score"><b id="run-score-val">0</b><small>PUNTOS</small></div>
+          <div class="run-chip" id="run-distance"><b id="run-distance-val">0 m</b><small>DISTANCIA</small></div>
         </div>
+        <div id="run-speed"><b id="run-speed-val">0</b><small>KM/H</small></div>
         <div id="run-flash"></div>
         <div id="run-combo" hidden><b id="run-combo-mult">x2</b><span>COMBO</span></div>
         <div id="run-wave" hidden><span>OLEADA</span><b id="run-wave-n">1</b></div>

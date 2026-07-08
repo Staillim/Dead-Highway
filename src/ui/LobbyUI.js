@@ -34,6 +34,17 @@ const CAR_COLORS = {
   tanker: '#6f9c4a'
 };
 
+// Tematización "Survival Drive" de cada tipo de misión: etiqueta, glifo y color de acento.
+const MISSION_KIND = {
+  kills:       { tag: 'CAZA',       glyph: '☠️', accent: '#ff5a4a' },
+  fatKills:    { tag: 'DEMOLICIÓN', glyph: '🧟', accent: '#8bc34a' },
+  runDistance: { tag: 'ODÓMETRO',   glyph: '🛣️', accent: '#4cc3ff' },
+  runs:        { tag: 'RESISTENCIA',glyph: '🏁', accent: '#f5c542' },
+  gas:         { tag: 'SAQUEO',     glyph: '⛽', accent: '#57c84d' },
+  coins:       { tag: 'BOTÍN',      glyph: '🪙', accent: '#f6c229' },
+  bestCombo:   { tag: 'FRENESÍ',    glyph: '🔥', accent: '#ff7a1a' }
+};
+
 const OFFER_DURATION_MS = (23 * 60 + 45) * 60 * 1000;
 
 const fmt = (n) => n.toLocaleString('en-US');
@@ -595,31 +606,37 @@ export class LobbyUI {
     return p.join('');
   }
 
+  // Una tarjeta de misión "Survival Drive" (deslizable). opts.fresh anima la entrada.
+  missionCardHTML(it, opts = {}) {
+    const meta = MISSION_KIND[it.type] || { tag: 'MISIÓN', glyph: '🎯', accent: '#8a63ff' };
+    const pct = Math.min(100, Math.round((it.progress / it.goal) * 100));
+    const done = it.progress >= it.goal;
+    const cta = it.claimed
+      ? `<span class="mi-claimed">✓ Reclamada</span>`
+      : done
+        ? `<button class="btn-primary mi-claim" data-action="claim-mission" data-key="${it.key}">RECLAMAR</button>`
+        : `<span class="mi-prog">${fmt(it.progress)} / ${fmt(it.goal)}</span>`;
+    return `
+      <div class="mi-card${done ? ' ready' : ''}${opts.fresh ? ' mi-fresh' : ''}" data-key="${it.key}" style="--accent:${meta.accent}">
+        <div class="mi-stamp">✓ RECLAMADA</div>
+        <div class="mi-top">
+          <span class="mi-tag"><span class="mi-glyph">${meta.glyph}</span>${meta.tag}</span>
+          <span class="mi-reward">${this.rewardChips(it.reward)}</span>
+        </div>
+        <div class="mi-title">${it.desc}</div>
+        <div class="mi-gauge"><i style="width:${pct}%"></i><b>${pct}%</b></div>
+        <div class="mi-foot">${cta}</div>
+      </div>`;
+  }
+
   renderMissions() {
     const m = ensureDailyMissions(this.state);
     const hrs = Math.max(1, Math.ceil((m.resetAt - Date.now()) / 3600000));
-    const rows = m.items.map((it) => {
-      const pct = Math.min(100, Math.round((it.progress / it.goal) * 100));
-      const done = it.progress >= it.goal;
-      const cta = it.claimed
-        ? `<span class="mi-claimed">✓ Reclamado</span>`
-        : done
-          ? `<button class="btn-primary mi-claim" data-action="claim-mission" data-key="${it.key}">RECLAMAR</button>`
-          : `<span class="mi-prog">${fmt(it.progress)}/${fmt(it.goal)}</span>`;
-      return `
-        <div class="mi-row ${done && !it.claimed ? 'ready' : ''}">
-          <div class="mi-info">
-            <div class="mi-desc">${it.desc}</div>
-            <div class="mi-bar"><i style="width:${pct}%"></i></div>
-          </div>
-          <div class="mi-reward">${this.rewardChips(it.reward)}</div>
-          <div class="mi-cta">${cta}</div>
-        </div>`;
-    }).join('');
+    const cards = m.items.map((it) => this.missionCardHTML(it)).join('');
     return `
-      <h2>Misiones diarias</h2>
-      <p class="sec-sub">Se renuevan en ${hrs} h · el progreso se suma al terminar cada carrera</p>
-      <div class="sec-list">${rows}</div>`;
+      <h2>Misiones · <span class="mi-brand">SURVIVAL DRIVE</span></h2>
+      <p class="sec-sub">Se renuevan en ${hrs} h · desliza las tarjetas · al reclamar aparece otra</p>
+      <div class="mi-deck">${cards}</div>`;
   }
 
   renderShop() {
@@ -712,13 +729,25 @@ export class LobbyUI {
   }
 
   doClaimMission(key) {
+    const card = document.querySelector(`.mi-card[data-key="${key}"]`);
     const r = claimMission(this.state, key);
     if (!r) { this.toast('Misión no completada'); return; }
-    this.persistAndRefresh();
+    // Guarda y refresca SOLO los recursos (no la sección) para no cortar la animación
+    PlayerState.save(this.state);
+    this.refreshResources();
     const parts = [];
-    if (r.coins) parts.push(`${fmt(r.coins)} monedas`);
-    if (r.gems) parts.push(`${r.gems} gemas`);
+    if (r.reward.coins) parts.push(`${fmt(r.reward.coins)} monedas`);
+    if (r.reward.gems) parts.push(`${r.reward.gems} gemas`);
     this.toast(`Recompensa: ${parts.join(' + ')}`);
+    if (!card) { this.refreshSection(); return; }
+    // 1) Sella la tarjeta (tachado + estampa) → 2) desliza fuera → 3) entra la nueva
+    card.classList.add('claimed-anim');
+    setTimeout(() => {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = this.missionCardHTML(r.newItem, { fresh: true }).trim();
+      const fresh = tmp.firstElementChild;
+      if (card.parentNode) card.replaceWith(fresh);
+    }, 850);
   }
 
   doClaimEvent(id, at) {

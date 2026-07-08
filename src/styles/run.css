@@ -11,9 +11,11 @@
   left: 0;
   right: 0;
   z-index: 10;
-  display: flex;
+  /* 3 columnas: grupo (izq) · PUNTOS (centro exacto) · distancia (der).
+     Las columnas laterales 1fr son iguales → los puntos quedan dead-center. */
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
   padding: calc(env(safe-area-inset-top, 0px) + 10px) 12px 8px;
   pointer-events: none;
@@ -22,6 +24,10 @@
 #run-hud > * {
   pointer-events: auto;
 }
+
+.hud-group { justify-self: start; }
+#run-score { justify-self: center; }
+#run-distance { justify-self: end; }
 
 #run-pause-btn {
   width: 42px;
@@ -62,43 +68,45 @@
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
+/* Distancia — chip a la derecha (medio) */
 #run-distance {
-  font-size: 18px;
-  min-width: 112px;
+  min-width: 94px;
   color: #fff;
+  line-height: 1;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
-
+#run-distance b { display: block; font-size: 17px; font-weight: 900; }
 #run-distance small {
   display: block;
   font-size: 8px;
   font-weight: 800;
   color: var(--gold);
-  letter-spacing: 1.6px;
+  letter-spacing: 1.5px;
   opacity: 0.85;
   margin-top: 1px;
 }
 
+/* Velocidad — pastilla chica DEBAJO de la barra (menos protagonismo) */
 #run-speed {
-  min-width: 66px;
-  border-color: rgba(245, 179, 1, 0.32);
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 62px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 3px 12px;
+  border-radius: 20px;
+  background: rgba(10, 11, 15, 0.5);
+  border: 1px solid rgba(245, 179, 1, 0.3);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  pointer-events: none;
   line-height: 1;
 }
-#run-speed b {
-  display: block;
-  font-size: 17px;
-  font-weight: 900;
-  color: var(--gold-hi);
-  text-shadow: 0 0 10px rgba(245, 179, 1, 0.35);
-}
-#run-speed small {
-  display: block;
-  font-size: 7.5px;
-  font-weight: 800;
-  letter-spacing: 1.5px;
-  color: var(--txt-dim);
-  margin-top: 1px;
-}
+#run-speed b { font-size: 15px; font-weight: 900; color: var(--gold-hi); text-shadow: 0 0 8px rgba(245, 179, 1, 0.35); }
+#run-speed small { font-size: 8px; font-weight: 800; letter-spacing: 1.2px; color: var(--txt-dim); }
 
 #run-hearts {
   font-size: 14px;
@@ -193,23 +201,26 @@
   gap: 8px;
 }
 
-/* PUNTOS — chip compacto a la izquierda (ya no cruza la distancia del centro) */
+/* PUNTOS — chip HÉROE en el centro (número grande blanco + PUNTOS dorado) */
 #run-score {
-  min-width: 58px;
+  min-width: 100px;
   line-height: 1;
+  text-align: center;
 }
 #run-score b {
   display: block;
-  font-size: 15px;
+  font-size: 22px;
   font-weight: 900;
-  color: var(--gold-hi);
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
 }
 #run-score small {
   display: block;
-  font-size: 7.5px;
+  font-size: 8px;
   font-weight: 800;
-  letter-spacing: 1.5px;
-  color: var(--txt-dim);
+  letter-spacing: 1.6px;
+  color: var(--gold);
+  opacity: 0.9;
   margin-top: 1px;
 }
 
@@ -240,18 +251,24 @@
   text-align: right;
   pointer-events: none;
   color: var(--gold-hi);
+  transform: rotate(-5deg);   /* leve inclinación = más dinámico/dopamínico */
+  transform-origin: right center;
 }
 #run-combo b {
   display: block;
-  font-size: 42px;
+  font-size: 44px;
   font-weight: 900;
   line-height: 0.82;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.55), 0 0 22px rgba(245, 179, 1, 0.65);
+  -webkit-text-stroke: 1.4px rgba(0, 0, 0, 0.9); /* borde negro delgado (ayuda a la sombra) */
+  paint-order: stroke fill;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6), 0 0 22px rgba(245, 179, 1, 0.65);
 }
 #run-combo span {
   font-size: 12px;
   font-weight: 900;
   letter-spacing: 3.5px;
+  -webkit-text-stroke: 0.8px rgba(0, 0, 0, 0.85);
+  paint-order: stroke fill;
 }
 /* Tiers: cuanto más alto el combo, más "caliente" el color */
 #run-combo[data-tier="warm"] { color: #ff9a3c; }
@@ -259,12 +276,12 @@
 #run-combo[data-tier="hot"] { color: #ff5a6e; }
 #run-combo[data-tier="hot"] b { font-size: 50px; text-shadow: 0 2px 10px rgba(0,0,0,0.55), 0 0 28px rgba(255,70,90,0.8); }
 #run-combo.pop {
-  animation: combo-pop 0.32s cubic-bezier(.2,1.4,.5,1);
+  animation: combo-pop 0.34s cubic-bezier(.2,1.5,.4,1);
 }
 @keyframes combo-pop {
-  0% { transform: scale(1.7) rotate(-3deg); }
-  55% { transform: scale(0.9) rotate(1deg); }
-  100% { transform: scale(1) rotate(0); }
+  0% { transform: rotate(-5deg) scale(1.8); }
+  55% { transform: rotate(-9deg) scale(0.86); }
+  100% { transform: rotate(-5deg) scale(1); }
 }
 
 /* Banner de oleada — aparece un momento en el centro */

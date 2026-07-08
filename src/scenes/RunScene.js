@@ -32,6 +32,9 @@ import { NightMode } from '../vfx/NightMode.js';
 import { VehicleLights } from '../vfx/VehicleLights.js';
 import { SmokeSystem } from '../vfx/SmokeSystem.js';
 import { AbilitySystem } from '../abilities/AbilitySystem.js';
+import { Tornado } from '../vfx/Tornado.js';
+import { FloatingText } from '../vfx/FloatingText.js';
+import { MissileVisual } from '../vfx/MissileVisual.js';
 import { computeFuelMax } from '../save/ShopFuelUpgrade.js';
 import { carById } from '../vehicles/VehicleConfig.js';
 
@@ -164,15 +167,20 @@ export class RunScene {
     // Recolectables extra: monedas / gemas / botiquín
     this.runPickups = new RunPickups(this.scene, {
       onCoin: (value, x, z) => {
-        this.runBonusCoins = (this.runBonusCoins || 0) + value;
+        this.runBonusCoins = (this.runBonusCoins || 0) + value; // se acredita en endRun
         this.score = (this.score || 0) + value;
         this.hud.setCombo(this.combo || 0, Math.min(GAMEPLAY.combo.maxMult, 1 + Math.floor((this.combo || 0) / GAMEPLAY.combo.killsPerTier)), this.score);
-        this.speedFx.burst(x, z, 3);
+        this.floatingText.pop(x, 1.2, z, `+${value}`, 0xffcf3f);
       },
-      onGem: (value, x, z) => { this.runBonusGems = (this.runBonusGems || 0) + value; this.speedFx.burst(x, z, 4); this.chaseCamera.addImpulse(0.2); },
+      onGem: (value, x, z) => {
+        this.runBonusGems = (this.runBonusGems || 0) + value; // se acredita en endRun
+        this.floatingText.pop(x, 1.35, z, `+${value} 💎`, 0x39e6ff);
+        this.chaseCamera.addImpulse(0.2);
+      },
       onMedkit: (x, z) => {
-        if (this.hp < this.maxHp) { this.hp += 1; this.hud.setHearts(this.hp, this.maxHp); }
-        this.speedFx.burst(x, z, 6); this.chaseCamera.addImpulse(0.3);
+        if (this.hp < this.maxHp) { this.hp += 1; this.hud.setHearts(this.hp, this.maxHp); this.floatingText.pop(x, 1.35, z, '+1 ❤', 0x53e06b); }
+        else this.floatingText.pop(x, 1.35, z, 'FULL', 0x53e06b);
+        this.chaseCamera.addImpulse(0.3);
       }
     });
     await this.runPickups.load();
@@ -215,6 +223,9 @@ export class RunScene {
     // --- Combate (Fases 3-5) ---
     this.gibs = new Gibs(this.scene);
     this.explosions = new Explosions(this.scene);
+    this.tornado = new Tornado(this.scene);            // dopamina de desierto
+    this.floatingText = new FloatingText(this.scene);  // "+N" al recoger
+    this.missileVisual = new MissileVisual(this.scene); // misil visible
     this.zombies = new ZombieSystem(this.scene, {
       onKill: (z, gibbed) => this.gibs.burst(z.x, 0.8, z.z, z.cfg.tint, gibbed ? 8 : 5),
       onFatExplode: (x, z, cfg) => this.onFatExplode(x, z, cfg),
@@ -230,7 +241,16 @@ export class RunScene {
     // Habilidades activas: misil (limpia zona) + EMP (aturde/frena tráfico)
     this.abilities = new AbilitySystem({
       zombies: this.zombies, traffic: this.traffic, explosions: this.explosions,
-      onMissile: (x, z) => { this.explosions.boom(x, z); this.chaseCamera.addImpulse(1.8); this.speedFx.addImpact(1.4); },
+      onMissile: (x, z, radius, damage) => {
+        const p = this.vehicle.object3D.position;
+        this.missileVisual.launch({ x: p.x, y: 1.2, z: p.z }, { x, z }, (tox, toz) => {
+          this.abilities.killInRadius(tox, toz, radius || 9, damage || 99);
+          this.explosions.boom(tox, toz);
+          this.explosions.boom(tox + (Math.random() - 0.5) * 5, toz + (Math.random() - 0.5) * 5);
+          this.chaseCamera.addImpulse(1.8);
+          this.speedFx.addImpact(1.4);
+        });
+      },
       onEmp: () => { this.chaseCamera.addImpulse(1.2); this.speedFx.addImpact(1.0); }
     });
     this.latched = [];
@@ -314,6 +334,9 @@ export class RunScene {
     this.runPickups.reset();
     this.nightMode.reset();
     this.smoke.reset();
+    this.tornado.reset();
+    this.floatingText.reset();
+    this.missileVisual.reset();
     this.vehicleLights.setNight(0);
     this.abilities.reset();
     this.abilities.setRefs({ zombies: this.zombies, traffic: this.traffic, explosions: this.explosions });
@@ -620,6 +643,9 @@ export class RunScene {
       this.vehicleLights.update(dt);
       if (this._exhaust) this._exhaust.x = this.vehicle.object3D.position.x + this.vehicle.width * 0.22;
       this.smoke.update(dt, speed);
+      this.tornado.update(dt, speed);
+      this.floatingText.update(dt, speed);
+      this.missileVisual.update(dt, speed);
       // Combo: se rompe si dejás de matar durante la ventana
       if (this.comboTimer > 0) {
         this.comboTimer -= dt;
