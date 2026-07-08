@@ -154,6 +154,51 @@ export class LobbyScene {
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     this.scene.add(ground);
+
+    // Grafiti en la base, BAJO el vehículo (tipografía del combo: Road Rage)
+    const gtex = this._graffitiTexture();
+    const decal = new THREE.Mesh(
+      new THREE.CircleGeometry(3.5, 48),
+      new THREE.MeshBasicMaterial({ map: gtex, transparent: true, opacity: 0.92, depthWrite: false })
+    );
+    decal.rotation.x = -Math.PI / 2;
+    decal.position.y = 0.012; // justo sobre la plataforma
+    decal.renderOrder = 1;
+    this.scene.add(decal);
+    this.graffitiDecal = decal;
+  }
+
+  // Textura de grafiti "DEAD HIGHWAY" con la fuente Road Rage (la del combo).
+  _graffitiTexture() {
+    const s = 1024;
+    const c = document.createElement('canvas');
+    c.width = c.height = s;
+    const ctx = c.getContext('2d');
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+    const draw = () => {
+      ctx.clearRect(0, 0, s, s);
+      ctx.save();
+      ctx.translate(s / 2, s / 2);
+      ctx.rotate(-0.1);
+      ctx.textAlign = 'center';
+      ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 6;
+      ctx.font = "900 220px 'Road Rage', Impact, 'Arial Narrow', sans-serif";
+      ctx.fillStyle = '#e6392e';
+      ctx.fillText('DEAD', 0, -30);
+      ctx.font = "900 150px 'Road Rage', Impact, 'Arial Narrow', sans-serif";
+      ctx.fillStyle = '#ffd23d';
+      ctx.fillText('HIGHWAY', 0, 140);
+      ctx.restore();
+      tex.needsUpdate = true;
+    };
+    draw();
+    // Redibujar cuando termine de cargar la fuente Road Rage (si aún no estaba)
+    if (document.fonts && document.fonts.load) {
+      document.fonts.load("200px 'Road Rage'").then(() => draw()).catch(() => {});
+    }
+    return tex;
   }
 
   setupContactShadow() {

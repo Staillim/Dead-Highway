@@ -36,6 +36,11 @@ el mundo viaja hacia +Z. Sin shadow maps (sombra de contacto blob).
   Banner "OLEADA N".
 - Comportamiento: vagabundeo (rumbos variados) → detectar coche (scream) → perseguir →
   biting/atropello. Muerte **procedural** (desplome con peso), explosión del gordo.
+- **Menos gordos**: si el sorteo saca `fat`, la mitad de las veces se reconvierte a
+  runner/normal (`spawn()`), así no saturan la carretera.
+- **Explosión del gordo en cadena**: al estallar (`RunScene.onFatExplode`) mata a los zombis
+  dentro de `explodeR·1.15` (recorre `getTargets()` y les aplica `hit(z,99)`), además del
+  daño al carro si está muy cerca. Reacción en cadena satisfactoria.
 - Animaciones FBX Mixamo reencauzadas al esqueleto Tripo — `src/zombies/ZombieAnimations.js`.
 - Rig procedural de respaldo — `src/zombies/ZombieRig.js`.
 
@@ -104,6 +109,10 @@ Al morir (0 vidas o sin gasolina) `endRun()` congela el mundo y muestra el resum
 **distancia**, **zombis eliminados**, **monedas y gemas recogidas**, **puntos** y récord
 (con "¡NUEVO RÉCORD!"). Botones **REINTENTAR** (`RunScene.retry()` rebobina sin volver al
 garaje) y **SALIR AL GARAJE**. La persistencia vive en `_finalizeRun()` (idempotente).
+**El audio CESA por completo**: `controller.paused=true` frena el update (las torretas y el
+arma de capó dejan de disparar), y `endRun()` hace `stopEngine()` + `stopAllSirens()` +
+`duck(0.04)` (master casi a cero → nada de sfx/impactos). Se restaura con `unduck()` al
+reintentar/salir.
 
 ## 🎨 Tipografía + look 4K
 
@@ -186,3 +195,23 @@ El **arma de capó** ya NO dispara sin enemigos (antes disparaba siempre hacia a
   entera → sin costura ni patrón repetido); antes se veía "rara" por blobs que se repetían.
 - Tarjetas de **Eventos** al estilo Survival Drive (acento, glifo, tipografía display, pulso
   de "listo para reclamar"), a juego con las de Misiones.
+
+## 🪧 Vallas + grafiti de marca + transición con logo
+
+- **Valla publicitaria "DEAD HIGHWAY"** en la partida — `src/environment/Billboards.js`: panel
+  metálico con óxido sobre postes, al lado de la vía. Usa la **tipografía del logo/lobby**
+  (Bahnschrift 900: "DEAD" crema + "HIGHWAY" rojo). Pool de 2 que se recicla en Z como el resto
+  de props (`update`/`reset`). Integrada en `RunScene` (crear/`update`/`reset` junto a `NearProps`).
+- **Grafiti bajo el coche del lobby** — `LobbyScene.setupGround()` + `_graffitiTexture()`: decal
+  circular en el suelo del garaje con "DEAD HIGHWAY" pintado a mano con la **tipografía del combo**
+  (Road Rage), de modo que el vehículo queda encima. Se redibuja cuando la fuente termina de cargar.
+- **Logo en la transición negra al pulsar JUGAR** — `index.html` (`#scene-fade > .fade-logo`) +
+  `lobby.css`: durante el fundido a negro del `SceneManager` aparece el logo **DEAD HIGHWAY**
+  (sin spinner; el spinner sigue solo en el overlay de carga inicial `#loading-overlay`).
+
+## 📐 HUD del editor responsive
+
+Al arrastrar indicadores del HUD en el editor de partida, las posiciones se guardan en **%**
+y se **clampan** a márgenes seguros tanto al soltar (`RunDevOverlay._startDrag`: x 4–96%, y 5–95%)
+como al aplicarlas (`RunHUD.applyLayout`: x 3–97%, y 4–96%), así no se salen ni se descuadran al
+cambiar de tamaño/relación de pantalla.

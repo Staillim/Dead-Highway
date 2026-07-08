@@ -158,7 +158,9 @@ export class ZombieSystem {
     // Sesgo a NORMAL que sube con la distancia → oleadas cada vez más densas de
     // zombis normales (más difícil al avanzar). El resto de tipos sigue saliendo.
     const normalBias = Math.min(0.6, (zc.normalBiasBase ?? 0.42) + (this.diff || 0) * (zc.normalBiasMax ?? 0.18));
-    const type = Math.random() < normalBias ? 'normal' : types[Math.floor(Math.random() * types.length)];
+    let type = Math.random() < normalBias ? 'normal' : types[Math.floor(Math.random() * types.length)];
+    // MENOS gordos: si salió gordo, la mitad de las veces cámbialo por runner/normal
+    if (type === 'fat' && Math.random() < 0.5) type = types.includes('runner') && Math.random() < 0.6 ? 'runner' : 'normal';
     const z = pick(this.pool, type);
     if (!z) return;
 

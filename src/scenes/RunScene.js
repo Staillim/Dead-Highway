@@ -10,6 +10,7 @@ import { SkyDome } from '../environment/SkyDome.js';
 import { FarBackdrop } from '../environment/FarBackdrop.js';
 import { MidProps } from '../environment/MidProps.js';
 import { NearProps } from '../environment/NearProps.js';
+import { Billboards } from '../environment/Billboards.js';
 import { Atmosphere } from '../environment/Atmosphere.js';
 import { AmbientEvents } from '../environment/AmbientEvents.js';
 import { Tumbleweeds } from '../environment/Tumbleweeds.js';
@@ -205,6 +206,7 @@ export class RunScene {
     this.hp = this.maxHp;
     this.mid = new MidProps(this.scene);
     this.near = new NearProps(this.scene);
+    this.billboards = new Billboards(this.scene); // vallas "DEAD HIGHWAY"
     await this.near.load();
     await this.mid.upgradeFromGlbs(); // GLB optimizados si existen; si no, procedurales
     this.atmosphere = new Atmosphere(this.scene);
@@ -364,6 +366,7 @@ export class RunScene {
     this.road.reset();
     this.mid.reset();
     this.near.reset();
+    this.billboards.reset();
     this.speedFx.reset();
     this.tumbleweeds.reset();
     this.obstacles.reset();
@@ -565,8 +568,17 @@ export class RunScene {
     this.chaseCamera.addImpulse(1.8);
     this.speedFx.addImpact(1.5);
     audio.explosion(x, z);
-    // Solo daña si el carro está realmente cerca (se puede esquivar cambiando
-    // de carril). El arador NO protege de la explosión (GDD §7).
+    // La explosión del gordo también DAÑA/mata a los zombis cercanos (reacción en
+    // cadena). getTargets() da una copia y hit() solo marca 'dying' → iterar es seguro.
+    const R = cfg.explodeR * 1.15;
+    const r2 = R * R;
+    for (const zt of this.zombies.getTargets()) {
+      if (zt === undefined) continue;
+      const ddx = zt.x - x, ddz = zt.z - z;
+      if (ddx * ddx + ddz * ddz <= r2) this.zombies.hit(zt, 99);
+    }
+    // Solo daña al CARRO si está realmente cerca (se puede esquivar cambiando de
+    // carril). El arador NO protege de la explosión (GDD §7).
     const dx = Math.abs(x - this.vehicle.object3D.position.x);
     if (Math.abs(z) < cfg.explodeR * 0.8 && dx < GAMEPLAY.lanes.width * 0.85) {
       this.loseHeart(2);
@@ -658,10 +670,11 @@ export class RunScene {
     const r = this._finalizeRun();
     if (!r) return;
     this.controller.paused = true; // congelar el mundo detrás de la pantalla
-    // El audio CAE en la pantalla de muerte: se apaga el motor y sirenas y baja el general
+    // El audio CESA en la pantalla de muerte: motor + sirenas apagados y el general
+    // casi a cero (torretas, sfx, todo). Se restaura al reintentar/salir.
     audio.stopEngine();
     audio.stopAllSirens();
-    audio.duck(0.18);
+    audio.duck(0.04);
     this.hud.showGameOver(r);
   }
 
@@ -723,6 +736,7 @@ export class RunScene {
 
       this.mid.update(dt, speed);
       this.near.update(dt, speed);
+      this.billboards.update(dt, speed);
       this.sky.update(dt);
       this.far.update(dt, speed * dt);
       this.atmosphere.update(dt, speed);

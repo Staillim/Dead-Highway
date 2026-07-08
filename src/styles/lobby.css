@@ -1819,12 +1819,30 @@ body.mode-run #run-ui-root {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.25s ease;
+  display: grid;
+  place-items: center;
 }
 
 #scene-fade.active {
   opacity: 1;
   pointer-events: auto;
 }
+
+/* Logo DEAD HIGHWAY en el fundido negro (transición JUGAR) — SIN ruedita de carga */
+.fade-logo {
+  font-family: Bahnschrift, 'Segoe UI', system-ui, sans-serif;
+  font-size: 42px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #e8e3da;
+  line-height: 0.95;
+  text-align: center;
+  transform: rotate(-3deg) scale(0.92);
+  opacity: 0;
+  transition: opacity 0.22s ease 0.06s, transform 0.35s ease;
+}
+.fade-logo span { display: block; color: var(--red); }
+#scene-fade.active .fade-logo { opacity: 1; transform: rotate(-3deg) scale(1); }
 
 /* Overlay de métricas (solo con ?debug) */
 #debug-stats {

@@ -181,9 +181,12 @@ export class RunHUD {
         // FIXED (no absolute): puntos/distancia son hijos del top-bar #run-hud; con
         // absolute quedaban anclados a esa barra fina y no se podían bajar. Fixed los
         // posiciona respecto al VIEWPORT → se mueven libres por toda la pantalla.
+        // Clamp % → responsive: nunca se salen de la pantalla en otros aspectos.
+        const xp = Math.max(3, Math.min(97, pos.xPct));
+        const yp = Math.max(4, Math.min(96, pos.yPct));
         el.style.position = 'fixed';
-        el.style.left = pos.xPct + '%';
-        el.style.top = pos.yPct + '%';
+        el.style.left = xp + '%';
+        el.style.top = yp + '%';
         el.style.right = 'auto';
         el.style.bottom = 'auto';
         el.style.justifySelf = 'auto';

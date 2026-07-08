@@ -230,12 +230,15 @@ export class RunDevOverlay {
     const rect = el.getBoundingClientRect();
     const cx0 = rect.left + rect.width / 2;
     const cy0 = rect.top + rect.height / 2;
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const move = (ev) => {
       const cx = cx0 + (ev.clientX - startX);
       const cy = cy0 + (ev.clientY - startY);
+      // Guardar como % del viewport y CLAMP para que no se salga ni se desajuste
+      // al cambiar de tamaño/aspecto de pantalla (responsive).
       this.working[id] = {
-        xPct: +(cx / window.innerWidth * 100).toFixed(2),
-        yPct: +(cy / window.innerHeight * 100).toFixed(2)
+        xPct: +clamp(cx / window.innerWidth * 100, 4, 96).toFixed(2),
+        yPct: +clamp(cy / window.innerHeight * 100, 5, 95).toFixed(2)
       };
       this.hud.applyLayout(this.working);
     };
