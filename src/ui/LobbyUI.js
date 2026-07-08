@@ -309,29 +309,31 @@ export class LobbyUI {
   }
 
   renderCars() {
+    const owned = this.state.ownedCars || [];
     return GARAGE_CARS.map((car) => {
-      const color = CAR_COLORS[car.id] || '#8a8f99';
+      const color = car.color || CAR_COLORS[car.id] || '#8a8f99';
+      const isOwned = owned.includes(car.id);
       const equipped = car.id === this.state.equipped.carId;
+      const powerPct = Math.round(((car.power || 1) - 1) * 100);
       let footer;
       if (equipped) {
         footer = '<span class="car-status equipped-tag">★ EQUIPADO</span>';
-      } else if (car.unlocked) {
+      } else if (isOwned) {
         footer = '<span class="car-status">USAR</span>';
       } else {
-        const pct = Math.round(((car.pieces || 0) / car.maxPieces) * 100);
-        footer = `
-          <div class="car-lock">
-            ${ICONS.lock}
-            <div class="pieces-bar"><div class="pieces-fill" style="width:${pct}%"></div></div>
-            <span class="pieces-count">${car.pieces || 0}/${car.maxPieces}</span>
-          </div>
-        `;
+        const p = car.price || {};
+        const cost = p.gems
+          ? `<span class="cost">${ICONS.gem}${fmt(p.gems)}</span>`
+          : `<span class="cost">${ICONS.coin}${fmt(p.coins || 0)}</span>`;
+        footer = `<span class="car-buy">${ICONS.lock} ${cost}</span>`;
       }
       return `
-        <button class="car-card ${equipped ? 'equipped' : ''} ${car.unlocked ? '' : 'locked'}"
+        <button class="car-card ${equipped ? 'equipped' : ''} ${isOwned ? '' : 'locked'} ${car.premium ? 'premium' : ''}"
                 data-action="car" data-id="${car.id}">
+          ${car.premium ? '<span class="car-premium-badge">PREMIUM</span>' : ''}
           <span class="car-name">${car.name}</span>
-          <div class="car-thumb">${carSilhouette(color)}</div>
+          <div class="car-thumb" style="--car-col:${color}">${carSilhouette(color)}</div>
+          <div class="car-power"><span class="stars">${this.stars(car.rarity || 1)}</span>${powerPct > 0 ? `<b>+${powerPct}%</b>` : ''}</div>
           ${footer}
         </button>
       `;
@@ -762,12 +764,20 @@ export class LobbyUI {
       this.toast(`${car.name} ya está equipado`);
       return;
     }
-    if (!car.unlocked) {
-      cardEl.classList.remove('shake');
-      void cardEl.offsetWidth;
-      cardEl.classList.add('shake');
-      this.toast(`Bloqueado — consigue las piezas (${car.pieces || 0}/${car.maxPieces})`);
-      return;
+
+    const owned = this.state.ownedCars || (this.state.ownedCars = []);
+    // Si NO lo tiene: intentar COMPRARLO
+    if (!owned.includes(carId)) {
+      const p = car.price || {};
+      if (p.gems && (this.state.gems || 0) < p.gems) { this.shakeCard(cardEl); this.toast(`Faltan gemas (${p.gems})`); return; }
+      if (p.coins && (this.state.coins || 0) < p.coins) { this.shakeCard(cardEl); this.toast(`Faltan monedas (${fmt(p.coins)})`); return; }
+      if (p.gems) this.state.gems -= p.gems;
+      if (p.coins) this.state.coins -= p.coins;
+      owned.push(carId);
+      PlayerState.save(this.state);
+      this.refreshResources();
+      this.toast(`¡${car.name} desbloqueado!`);
+      // se equipa automáticamente lo recién comprado
     }
     if (this.busy) return;
 
@@ -784,28 +794,17 @@ export class LobbyUI {
     }
   }
 
+  shakeCard(el) {
+    if (!el) return;
+    el.classList.remove('shake');
+    void el.offsetWidth;
+    el.classList.add('shake');
+  }
+
   refreshCarCards() {
-    const equippedId = this.state.equipped.carId;
-    const colorMap = CAR_COLORS;
-    document.querySelectorAll('[data-action="car"]').forEach((card) => {
-      const id = card.dataset.id;
-      const car = GARAGE_CARS.find((c) => c.id === id);
-      if (!car) return;
-      const equipped = id === equippedId;
-      card.classList.toggle('equipped', equipped);
-      const thumb = card.querySelector('.car-thumb');
-      if (thumb) thumb.style.color = equipped ? '#f5b301' : (colorMap[id] || '#8a8f99');
-      const footer = card.querySelector('.car-status');
-      if (footer) {
-        if (equipped) {
-          footer.className = 'car-status equipped-tag';
-          footer.textContent = '★ EQUIPADO';
-        } else if (car.unlocked) {
-          footer.className = 'car-status';
-          footer.textContent = 'USAR';
-        }
-      }
-    });
+    // Re-render completo de la fila (cambian los pies: comprar → USAR → EQUIPADO)
+    const row = document.getElementById('cars-row');
+    if (row) row.innerHTML = this.renderCars();
   }
 
   async handleTurret(turretId, cardEl) {

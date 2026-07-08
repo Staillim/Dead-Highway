@@ -1043,6 +1043,46 @@ button {
   color: var(--green);
 }
 
+/* Coche premium + compra + poder */
+.car-card.premium {
+  border-color: rgba(245, 179, 1, 0.55);
+  background: linear-gradient(180deg, rgba(80, 60, 12, 0.35), rgba(20, 20, 26, 0.65));
+}
+.car-premium-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-size: 7.5px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: #1a1206;
+  background: linear-gradient(180deg, #ffd23d, #e59400);
+  padding: 2px 6px;
+  border-radius: 6px;
+  z-index: 2;
+}
+.car-power {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 9px;
+  margin: 2px 0 1px;
+}
+.car-power b { color: #6fdc5a; font-weight: 900; }
+.car-power .stars { font-size: 9px; }
+.car-buy {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--gold-hi);
+}
+.car-buy svg { width: 12px; height: 12px; flex: none; }
+.car-buy .cost { display: inline-flex; align-items: center; gap: 2px; }
+.car-buy .cost svg { width: 13px; height: 13px; }
+
 .car-lock {
   display: flex;
   align-items: center;

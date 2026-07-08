@@ -33,6 +33,7 @@ import { VehicleLights } from '../vfx/VehicleLights.js';
 import { SmokeSystem } from '../vfx/SmokeSystem.js';
 import { AbilitySystem } from '../abilities/AbilitySystem.js';
 import { computeFuelMax } from '../save/ShopFuelUpgrade.js';
+import { carById } from '../vehicles/VehicleConfig.js';
 
 const DEBUG = new URLSearchParams(location.search).has('debug');
 
@@ -87,10 +88,12 @@ export class RunScene {
   // Aplica las mejoras del garaje (PlayerState.upgrades) a los stats de la partida
   applyUpgrades() {
     const st = computeUpgradeStats(this.state);
-    this.maxHp = st.maxHp;
-    this.hp = st.maxHp;
-    this.controller.speedMul = st.speedMul;
-    this.turret.setStats({ damage: st.turretDamage, fireRate: GAMEPLAY.turret.fireRate * st.turretFireRateMul });
+    // Poder del COCHE equipado: multiplica hp/velocidad/daño (el premium pega más)
+    const carPower = (carById(this.state.equipped.carId)?.power) || 1;
+    this.maxHp = st.maxHp + (carPower >= 1.4 ? 2 : carPower >= 1.2 ? 1 : 0); // coches potentes: +corazón
+    this.hp = this.maxHp;
+    this.controller.speedMul = st.speedMul * (0.85 + carPower * 0.15);
+    this.turret.setStats({ damage: Math.round(st.turretDamage * carPower), fireRate: GAMEPLAY.turret.fireRate * st.turretFireRateMul });
     // Munición desbloqueada por el nivel de la torreta (override dev: ?ammo=explosive)
     const ammoOverride = new URLSearchParams(location.search).get('ammo');
     this.turret.setBulletType(ammoOverride && GAMEPLAY.turret.bulletTypes[ammoOverride] ? ammoOverride : st.ammoType);

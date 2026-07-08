@@ -1,4 +1,4 @@
-import { VEHICLE_UPGRADES } from '../vehicles/VehicleConfig.js';
+import { VEHICLE_UPGRADES, DEFAULT_OWNED_CARS } from '../vehicles/VehicleConfig.js';
 
 // Niveles iniciales de mejora tomados de la configuración base
 const DEFAULT_UPGRADES = Object.fromEntries(
@@ -39,6 +39,8 @@ const DEFAULT_STATE = {
     totalDistance: 0,   // metros recorridos (acumulado)
     gasCollected: 0     // bidones recogidos (acumulado)
   },
+  // Coches que el jugador posee (los demás se compran)
+  ownedCars: [...DEFAULT_OWNED_CARS],
   // Misiones diarias: se regeneran cada 24h (ver save/Missions.js)
   missions: null,
   // Hitos de evento ya reclamados: { 'marathon:5000': true, ... }
@@ -53,15 +55,19 @@ export class PlayerState {
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
-        return {
+        const merged = {
           ...DEFAULT_STATE,
           ...parsed,
           equipped: { ...DEFAULT_STATE.equipped, ...parsed.equipped },
           upgrades: { ...DEFAULT_UPGRADES, ...parsed.upgrades },
           battlePass: { ...DEFAULT_STATE.battlePass, ...parsed.battlePass },
           stats: { ...DEFAULT_STATE.stats, ...parsed.stats },
-          eventsClaimed: { ...DEFAULT_STATE.eventsClaimed, ...parsed.eventsClaimed }
+          eventsClaimed: { ...DEFAULT_STATE.eventsClaimed, ...parsed.eventsClaimed },
+          ownedCars: (parsed.ownedCars && parsed.ownedCars.length) ? parsed.ownedCars : [...DEFAULT_OWNED_CARS]
         };
+        // El coche equipado debe ser uno que se posee
+        if (!merged.ownedCars.includes(merged.equipped.carId)) merged.equipped.carId = merged.ownedCars[0];
+        return merged;
       } catch (e) {
         console.warn('Estado corrupto, usando default', e);
       }

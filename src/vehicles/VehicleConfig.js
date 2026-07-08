@@ -23,10 +23,19 @@ export const CAR_MODEL_FILES = {
   tanker: 'swat+armored+vehicle+3d+model'
 };
 
+// Catálogo de coches: solo el Destructor viene desbloqueado; el resto se COMPRA
+// (monedas o gemas). `power` es un multiplicador de stats que aplica la partida
+// (hp/daño/velocidad). El Tanker SWAT es PREMIUM (gemas) con las mejores stats.
 export const GARAGE_CARS = [
-  { id: 'rugged_car_01', name: 'Destructor', unlocked: true, equipped: true, pieces: null, maxPieces: null },
-  { id: 'predator', name: 'Predator', unlocked: true, pieces: null, maxPieces: null },
-  { id: 'thunder', name: 'Thunder', unlocked: true, pieces: null, maxPieces: null },
-  { id: 'raptor', name: 'Raptor', unlocked: true, pieces: null, maxPieces: null },
-  { id: 'tanker', name: 'Tanker', unlocked: true, pieces: null, maxPieces: null }
+  { id: 'rugged_car_01', name: 'Destructor', color: '#e04a3a', price: null, power: 1.0, rarity: 1 },
+  { id: 'predator', name: 'Predator', color: '#9b4ddb', price: { coins: 8000 }, power: 1.08, rarity: 2 },
+  { id: 'thunder', name: 'Thunder', color: '#f2c21f', price: { coins: 16000 }, power: 1.15, rarity: 3 },
+  { id: 'raptor', name: 'Raptor', color: '#3f8ef2', price: { coins: 30000 }, power: 1.24, rarity: 4 },
+  { id: 'tanker', name: 'Tanker SWAT', color: '#6f9c4a', price: { gems: 350 }, power: 1.42, rarity: 5, premium: true }
 ];
+
+// Coche(s) que el jugador tiene de arranque
+export const DEFAULT_OWNED_CARS = ['rugged_car_01'];
+
+// Devuelve la config de un coche por id
+export const carById = (id) => GARAGE_CARS.find((c) => c.id === id) || GARAGE_CARS[0];
