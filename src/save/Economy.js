@@ -28,7 +28,13 @@ export const EVENTS = [
     milestones: [ { at: 5000, reward: { coins: 1000 } }, { at: 15000, reward: { gems: 15 } }, { at: 40000, reward: { coins: 5000, gems: 30 } } ] },
   { id: 'purge', icon: 'turret', title: 'La Purga', desc: 'Elimina zombis acumulados durante el evento.',
     stat: 'totalKills', unit: 'zombis',
-    milestones: [ { at: 200, reward: { coins: 800 } }, { at: 600, reward: { gems: 12 } }, { at: 1500, reward: { coins: 4000 } } ] }
+    milestones: [ { at: 200, reward: { coins: 800 } }, { at: 600, reward: { gems: 12 } }, { at: 1500, reward: { coins: 4000 } } ] },
+  { id: 'rescate', icon: 'fuel', title: 'Operación Rescate', desc: 'Recoge bidones de gasolina acumulados.',
+    stat: 'gasCollected', unit: 'bidones',
+    milestones: [ { at: 20, reward: { coins: 700 } }, { at: 60, reward: { gems: 10 } }, { at: 150, reward: { coins: 3500, gems: 15 } } ] },
+  { id: 'boss', icon: 'chest', title: 'Cazador de Gordos', desc: 'Revienta zombis gordos acumulados.',
+    stat: 'fatKills', unit: 'gordos',
+    milestones: [ { at: 25, reward: { coins: 900 } }, { at: 75, reward: { gems: 14 } }, { at: 200, reward: { coins: 5000 } } ] }
 ];
 
 export const canAfford = (state, cost) =>

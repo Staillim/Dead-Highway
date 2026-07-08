@@ -7,11 +7,17 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const MISSION_POOL = [
   { key: 'kills_s', type: 'kills',       goal: 40,   reward: { coins: 400 },          text: (g) => `Elimina ${g} zombis` },
   { key: 'kills_l', type: 'kills',       goal: 120,  reward: { coins: 900, gems: 2 }, text: (g) => `Elimina ${g} zombis` },
+  { key: 'kills_xl',type: 'kills',       goal: 250,  reward: { coins: 1600, gems: 4 },text: (g) => `Elimina ${g} zombis` },
   { key: 'dist_s',  type: 'runDistance', goal: 2000, reward: { coins: 600 },          text: (g) => `Recorre ${g} m en una carrera` },
   { key: 'dist_l',  type: 'runDistance', goal: 4000, reward: { coins: 1200, gems: 3 },text: (g) => `Recorre ${g} m en una carrera` },
+  { key: 'dist_xl', type: 'runDistance', goal: 7000, reward: { coins: 2200, gems: 6 },text: (g) => `Recorre ${g} m en una carrera` },
   { key: 'runs',    type: 'runs',        goal: 3,    reward: { coins: 300 },          text: (g) => `Juega ${g} carreras` },
+  { key: 'runs_l',  type: 'runs',        goal: 6,    reward: { coins: 700 },          text: (g) => `Juega ${g} carreras` },
   { key: 'fat',     type: 'fatKills',    goal: 5,    reward: { coins: 500, gems: 1 }, text: (g) => `Revienta ${g} zombis gordos` },
-  { key: 'gas',     type: 'gas',         goal: 6,    reward: { coins: 350 },          text: (g) => `Recoge ${g} bidones de gasolina` }
+  { key: 'fat_l',   type: 'fatKills',    goal: 12,   reward: { coins: 1100, gems: 3 },text: (g) => `Revienta ${g} zombis gordos` },
+  { key: 'gas',     type: 'gas',         goal: 6,    reward: { coins: 350 },          text: (g) => `Recoge ${g} bidones de gasolina` },
+  { key: 'coins',   type: 'coins',       goal: 800,  reward: { coins: 500 },          text: (g) => `Recoge ${g} monedas en carrera` },
+  { key: 'combo',   type: 'bestCombo',   goal: 15,   reward: { coins: 900, gems: 2 }, text: (g) => `Alcanza un combo de x${g}` }
 ];
 
 const dayIndex = (now) => Math.floor(now / DAY_MS);
@@ -45,8 +51,10 @@ export function applyRunToMissions(state, run) {
       case 'kills':       it.progress += run.kills || 0; break;
       case 'fatKills':    it.progress += run.fatKills || 0; break;
       case 'gas':         it.progress += run.gas || 0; break;
+      case 'coins':       it.progress += run.coins || 0; break;
       case 'runs':        it.progress += 1; break;
       case 'runDistance': it.progress = Math.max(it.progress, Math.round(run.distance || 0)); break; // mejor carrera
+      case 'bestCombo':   it.progress = Math.max(it.progress, run.bestCombo || 0); break;
     }
     if (it.progress > it.goal) it.progress = it.goal;
   }

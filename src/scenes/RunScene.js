@@ -556,7 +556,7 @@ export class RunScene {
     stats.bestCombo = Math.max(stats.bestCombo || 0, this.bestCombo || 0);
     this.state.stats = stats;
     // Progreso de misiones diarias con el resultado de esta carrera
-    applyRunToMissions(this.state, { kills, fatKills, distance: dist, gas });
+    applyRunToMissions(this.state, { kills, fatKills, distance: dist, gas, coins: Math.round(this.runBonusCoins || 0), bestCombo: this.bestCombo || 0 });
     // Recompensas: monedas, gemas y XP de pase de batalla + bono por score/combo
     this.lastRewards = awardRunRewards(this.state, dist);
     const scoreCoins = Math.round(score * GAMEPLAY.combo.coinsPerScore);
