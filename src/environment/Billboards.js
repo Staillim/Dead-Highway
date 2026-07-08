@@ -40,7 +40,7 @@ export class Billboards {
   constructor(scene, { count = 2 } = {}) {
     this.scene = scene;
     this.items = [];
-    this.span = 300; // metros entre vallas
+    this.span = 900; // metros entre vallas (raras: casi no aparecen seguidas)
     const panelMat = new THREE.MeshLambertMaterial({ map: deadHighwayTexture() });
     const backMat = new THREE.MeshLambertMaterial({ color: 0x14161c });
     const postMat = new THREE.MeshLambertMaterial({ color: 0x3a3d45 });

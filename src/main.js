@@ -10,6 +10,7 @@ import { LobbyUI } from './ui/LobbyUI.js';
 import { buildEquipped } from './vehicles/EquippedLoader.js';
 import { GAMEPLAY } from './config/gameplay.js';
 import { loadRunConfig } from './config/RunConfig.js';
+import { audio } from './audio/AudioManager.js';
 
 const DEBUG = new URLSearchParams(location.search).has('debug');
 
@@ -42,20 +43,27 @@ async function init() {
   scenes.register('lobby', () => lobby);
 
   let ui;
+  // Música ambiental del lobby: sólo puede sonar tras un gesto (autoplay). Arranca
+  // en el primer toque/clic si estamos en el lobby; para al entrar en partida y
+  // vuelve al salir de la carrera.
+  let inLobby = true;
+  const unlockAudio = () => { audio.ensure(); if (inLobby) audio.startLobbyMusic(); };
+  window.addEventListener('pointerdown', unlockAudio, { once: true });
+
   // La escena de partida se carga perezosa: el lobby arranca ligero
   scenes.register('run', async () => {
     const { RunScene } = await import('./scenes/RunScene.js');
     return new RunScene({
       engine,
       state,
-      onExit: async () => { await scenes.switchTo('lobby'); ui?.refreshResources(); }
+      onExit: async () => { await scenes.switchTo('lobby'); inLobby = true; audio.startLobbyMusic(); ui?.refreshResources(); }
     });
   });
 
   ui = new LobbyUI({
     state,
     onViewChange: (view) => lobby.setStageView(view),
-    onPlay: () => scenes.switchTo('run', { equipped: buildEquipped(state, discovered) }),
+    onPlay: () => { inLobby = false; audio.stopLobbyMusic(); scenes.switchTo('run', { equipped: buildEquipped(state, discovered) }); },
     onEquipCar: async (carId) => {
       state.equipped.carId = carId;
       PlayerState.save(state);

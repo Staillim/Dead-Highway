@@ -19,8 +19,9 @@ export class AudioManager {
     this.enabled = true;
     this.engine = null;
     this.noiseBuffer = null;
-    this.volumes = { master: 0.8, engine: 0.5, sfx: 0.9, siren: 0.55, zombie: 0.7 };
+    this.volumes = { master: 0.8, engine: 0.5, sfx: 0.9, siren: 0.55, zombie: 0.7, ambient: 0.62 };
     this.carSound = { base: 90, type: 'sawtooth', rev: 1.0 }; // motor del jugador (por coche)
+    this.music = null; // música ambiental del lobby (pad apocalíptico procedural)
     this.shotOverride = null; // fuerza un estilo de disparo (elegido en dev); null = el de la torreta
     this.sirenParams = JSON.parse(JSON.stringify(SIREN_PARAMS)); // editable en dev
     this._sirens = new Map();
@@ -338,6 +339,69 @@ export class AudioManager {
     this._sirens.delete(id);
   }
   stopAllSirens() { for (const id of [...this._sirens.keys()]) this.stopSiren(id); }
+
+  // --- MÚSICA ambiental del LOBBY: pad APOCALÍPTICO 100% sintetizado (sin archivos
+  // → sin copyright ni descargas). Capas: drone menor grave (Dm) que respira con un
+  // barrido de filtro lento, viento de páramo (ruido filtrado en ráfagas), sub de
+  // pavor con trémolo y una disonancia de tritono muy tenue que va y viene. Sin
+  // patrón rítmico → loop infinito sin costura. Va por el bus `ambient`.
+  startLobbyMusic() {
+    this.ensure();
+    if (!this.ctx || this.music) return;
+    const t0 = this.ctx.currentTime;
+    const g = this.ctx.createGain(); g.gain.value = 0; g.connect(this.buses.ambient);
+    const nodes = [];
+
+    // Pad de acorde menor grave (D2, F2, A2) — sierras detuneadas por un lowpass
+    const padLP = this.ctx.createBiquadFilter(); padLP.type = 'lowpass'; padLP.frequency.value = 360; padLP.Q.value = 5;
+    padLP.connect(g);
+    // Barrido MUY lento del filtro → el pad evoluciona y nunca suena "en bucle"
+    const sweep = this.ctx.createOscillator(); sweep.type = 'sine'; sweep.frequency.value = 0.035;
+    const sweepG = this.ctx.createGain(); sweepG.gain.value = 240; sweep.connect(sweepG); sweepG.connect(padLP.frequency);
+    nodes.push(sweep);
+    for (const f of [73.42, 87.31, 110.0]) { // D2 · F2 · A2
+      const a = this.ctx.createOscillator(); a.type = 'sawtooth'; a.frequency.value = f; a.detune.value = 5;
+      const b = this.ctx.createOscillator(); b.type = 'sawtooth'; b.frequency.value = f; b.detune.value = -8;
+      const vg = this.ctx.createGain(); vg.gain.value = 0.11;
+      a.connect(vg); b.connect(vg); vg.connect(padLP);
+      nodes.push(a, b);
+    }
+
+    // Sub de pavor (D1) con trémolo lento
+    const sub = this.ctx.createOscillator(); sub.type = 'sine'; sub.frequency.value = 36.71;
+    const subG = this.ctx.createGain(); subG.gain.value = 0.17; sub.connect(subG); subG.connect(g);
+    const subTrem = this.ctx.createOscillator(); subTrem.type = 'sine'; subTrem.frequency.value = 0.12;
+    const subTremG = this.ctx.createGain(); subTremG.gain.value = 0.09; subTrem.connect(subTremG); subTremG.connect(subG.gain);
+    nodes.push(sub, subTrem);
+
+    // Viento de páramo: ruido en loop → bandpass barrido + trémolo (ráfagas)
+    const wind = this.ctx.createBufferSource(); wind.buffer = this.noiseBuffer; wind.loop = true;
+    const windBP = this.ctx.createBiquadFilter(); windBP.type = 'bandpass'; windBP.frequency.value = 520; windBP.Q.value = 0.8;
+    const windG = this.ctx.createGain(); windG.gain.value = 0.085; wind.connect(windBP); windBP.connect(windG); windG.connect(g);
+    const windLFO = this.ctx.createOscillator(); windLFO.type = 'sine'; windLFO.frequency.value = 0.06;
+    const windLFOG = this.ctx.createGain(); windLFOG.gain.value = 300; windLFO.connect(windLFOG); windLFOG.connect(windBP.frequency);
+    const windTrem = this.ctx.createOscillator(); windTrem.type = 'sine'; windTrem.frequency.value = 0.085;
+    const windTremG = this.ctx.createGain(); windTremG.gain.value = 0.05; windTrem.connect(windTremG); windTremG.connect(windG.gain);
+    nodes.push(wind, windLFO, windTrem);
+
+    // Disonancia de TRITONO (Ab3, "diabolus in musica") muy tenue que swellea → dread
+    const trit = this.ctx.createOscillator(); trit.type = 'triangle'; trit.frequency.value = 207.65;
+    const tritG = this.ctx.createGain(); tritG.gain.value = 0.02; trit.connect(tritG); tritG.connect(g);
+    const tritLFO = this.ctx.createOscillator(); tritLFO.type = 'sine'; tritLFO.frequency.value = 0.045;
+    const tritLFOG = this.ctx.createGain(); tritLFOG.gain.value = 0.018; tritLFO.connect(tritLFOG); tritLFOG.connect(tritG.gain);
+    nodes.push(trit, tritLFO);
+
+    for (const n of nodes) { try { n.start(t0); } catch (e) {} }
+    g.gain.linearRampToValueAtTime(0.62, t0 + 3.5); // fade-in lento y ominoso
+    this.music = { g, nodes };
+  }
+  stopLobbyMusic() {
+    if (!this.music || !this.ctx) return;
+    const { g, nodes } = this.music;
+    g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.5);
+    setTimeout(() => { for (const n of nodes) { try { n.stop(); } catch (e) {} } }, 1700);
+    this.music = null;
+  }
 }
 
 export const audio = new AudioManager();

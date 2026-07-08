@@ -164,6 +164,7 @@ export class LobbyScene {
     decal.rotation.x = -Math.PI / 2;
     decal.position.y = 0.012; // justo sobre la plataforma
     decal.renderOrder = 1;
+    decal.visible = false; // sólo se muestra en la vista de COCHES (ver setStageView)
     this.scene.add(decal);
     this.graffitiDecal = decal;
   }
@@ -177,19 +178,28 @@ export class LobbyScene {
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 4;
+    // Cada palabra se dibuja con BORDE oscuro (contorno stencil) + relleno encima,
+    // para que el grafiti resalte sobre el metal de la plataforma.
+    const word = (txt, y, sizePx, fill) => {
+      ctx.font = `900 ${sizePx}px 'Road Rage', Impact, 'Arial Narrow', sans-serif`;
+      // Borde (con sombra proyectada)
+      ctx.shadowColor = 'rgba(0,0,0,0.55)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 8;
+      ctx.lineWidth = Math.round(sizePx * 0.075); ctx.strokeStyle = '#160707';
+      ctx.strokeText(txt, 0, y);
+      // Relleno sin sombra encima del borde
+      ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+      ctx.fillStyle = fill;
+      ctx.fillText(txt, 0, y);
+    };
     const draw = () => {
       ctx.clearRect(0, 0, s, s);
       ctx.save();
       ctx.translate(s / 2, s / 2);
       ctx.rotate(-0.1);
       ctx.textAlign = 'center';
-      ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 6;
-      ctx.font = "900 220px 'Road Rage', Impact, 'Arial Narrow', sans-serif";
-      ctx.fillStyle = '#e6392e';
-      ctx.fillText('DEAD', 0, -30);
-      ctx.font = "900 150px 'Road Rage', Impact, 'Arial Narrow', sans-serif";
-      ctx.fillStyle = '#ffd23d';
-      ctx.fillText('HIGHWAY', 0, 140);
+      ctx.lineJoin = 'round'; ctx.miterLimit = 2;
+      word('DEAD', -30, 220, '#e6392e');
+      word('HIGHWAY', 140, 150, '#ffd23d');
       ctx.restore();
       tex.needsUpdate = true;
     };
@@ -387,6 +397,8 @@ export class LobbyScene {
   setStageView(view) {
     if (!STAGE.frames[view]) view = 'garage';
     this.stageView = view;
+    // El grafiti "DEAD HIGHWAY" SOLO aparece en la vista de COCHES (bajo el vehículo).
+    if (this.graffitiDecal) this.graffitiDecal.visible = view === 'cars';
     this.layoutStage();
   }
 
@@ -397,6 +409,13 @@ export class LobbyScene {
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
     if (!w || !h) return;
+
+    // Grafiti responsive: en pantallas angostas (portrait/móvil) el ancho del mundo
+    // abarca MÁS pantalla → se encoge el decal para que no se desborde ni se agrande.
+    if (this.graffitiDecal) {
+      const gs = Math.max(0.45, Math.min(1, 0.82 * (w / h)));
+      this.graffitiDecal.scale.setScalar(gs);
+    }
 
     const { width: W0, height: H0 } = STAGE.bg;
     const frame = STAGE.frames[this.stageView] || STAGE.frames.garage;

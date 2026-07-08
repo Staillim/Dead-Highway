@@ -175,6 +175,12 @@ Todo el sonido es **sintetizado con Web Audio** (sin archivos → cero descargas
 - **Sirenas** variadas (ambulancia/bombero/policía) para el tráfico de emergencia: loop
   paneado por X y atenuado por distancia (se oyen llegar y pasar).
 - **Envolvente**: cada sfx se panea (StereoPanner) y baja de volumen con la distancia.
+- **Música del LOBBY** — `startLobbyMusic()`/`stopLobbyMusic()` (bus `ambient`): pad
+  **apocalíptico 100% sintetizado** (sin copyright ni archivos): drone menor grave (Dm) con
+  barrido de filtro lento, viento de páramo (ruido filtrado en ráfagas), sub de pavor con
+  trémolo y una disonancia de tritono muy tenue que va y viene. Loop sin costura. Arranca en
+  el primer gesto del lobby (autoplay), para al pulsar JUGAR y vuelve al salir de la carrera
+  (`main.js`).
 - El AudioContext se crea/reanuda en el gesto de JUGAR (política de autoplay). Botón de
   **mute** en el HUD (persistido).
 - **Editable en modo dev** (sección SONIDOS): volúmenes por bus, motor del coche (Hz/onda),
@@ -202,9 +208,13 @@ El **arma de capó** ya NO dispara sin enemigos (antes disparaba siempre hacia a
   metálico con óxido sobre postes, al lado de la vía. Usa la **tipografía del logo/lobby**
   (Bahnschrift 900: "DEAD" crema + "HIGHWAY" rojo). Pool de 2 que se recicla en Z como el resto
   de props (`update`/`reset`). Integrada en `RunScene` (crear/`update`/`reset` junto a `NearProps`).
+  **Aparece RARA** (`span` 900 m): casi nunca hay una a la vista, para que no canse.
 - **Grafiti bajo el coche del lobby** — `LobbyScene.setupGround()` + `_graffitiTexture()`: decal
-  circular en el suelo del garaje con "DEAD HIGHWAY" pintado a mano con la **tipografía del combo**
-  (Road Rage), de modo que el vehículo queda encima. Se redibuja cuando la fuente termina de cargar.
+  circular en el suelo con "DEAD HIGHWAY" pintado a mano con la **tipografía del combo** (Road Rage)
+  + **borde oscuro** (stencil) para que resalte sobre el metal. Sólo se muestra en la **vista de
+  COCHES** (`setStageView` alterna `visible`; oculto en garaje/mejoras/torretas), con el vehículo
+  encima. **Escala responsive**: en pantallas angostas se encoge (`0.82·aspect`, clamp 0.45–1) para
+  que no se desborde ni se agrande. Se redibuja cuando la fuente Road Rage termina de cargar.
 - **Logo en la transición negra al pulsar JUGAR** — `index.html` (`#scene-fade > .fade-logo`) +
   `lobby.css`: durante el fundido a negro del `SceneManager` aparece el logo **DEAD HIGHWAY**
   (sin spinner; el spinner sigue solo en el overlay de carga inicial `#loading-overlay`).
