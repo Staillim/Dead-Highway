@@ -249,6 +249,9 @@ export class RunScene {
     this.zombies = new ZombieSystem(this.scene, {
       onKill: (z, gibbed) => { this.gibs.burst(z.x, 0.8, z.z, z.cfg.tint, gibbed ? 8 : 5); audio.zombieDeath(z.x, z.z); },
       onFatExplode: (x, z, cfg) => this.onFatExplode(x, z, cfg),
+      // Vecino muerto por la explosión: SOLO un gib barato (sin audio/boom/cámara) →
+      // la cadena se ve pero no dispara un pico de trabajo por cada zombi.
+      onChainKill: (z) => this.gibs.burst(z.x, 0.8, z.z, z.cfg.tint, z.type === 'fat' ? 6 : 3),
       onReachCar: (z) => this.tryLatch(z),
       onDeath: (z) => this.registerKill(z),
       onScream: (x, z) => audio.zombieGroan(x, z),
@@ -568,15 +571,9 @@ export class RunScene {
     this.chaseCamera.addImpulse(1.8);
     this.speedFx.addImpact(1.5);
     audio.explosion(x, z);
-    // La explosión del gordo también DAÑA/mata a los zombis cercanos (reacción en
-    // cadena). getTargets() da una copia y hit() solo marca 'dying' → iterar es seguro.
-    const R = cfg.explodeR * 1.15;
-    const r2 = R * R;
-    for (const zt of this.zombies.getTargets()) {
-      if (zt === undefined) continue;
-      const ddx = zt.x - x, ddz = zt.z - z;
-      if (ddx * ddx + ddz * ddz <= r2) this.zombies.hit(zt, 99);
-    }
+    // La explosión del gordo mata a los zombis cercanos (reacción en cadena). Ese
+    // daño en área lo aplica ZombieSystem._chainKill (barato, sin recursión ni
+    // boom/audio por cada vecino) → sin el pico de lag que causaba antes.
     // Solo daña al CARRO si está realmente cerca (se puede esquivar cambiando de
     // carril). El arador NO protege de la explosión (GDD §7).
     const dx = Math.abs(x - this.vehicle.object3D.position.x);

@@ -15,10 +15,11 @@ const TYPE_URLS = {
 // El mundo los trae hacia el carro; cada uno suma su locomoción y se dirige al
 // carril del jugador. La torreta los mata; los que llegan al carro hacen daño.
 export class ZombieSystem {
-  constructor(scene, { onKill, onFatExplode, onReachCar, onDeath, onWave, onScream } = {}) {
+  constructor(scene, { onKill, onFatExplode, onChainKill, onReachCar, onDeath, onWave, onScream } = {}) {
     this.scene = scene;
     this.onKill = onKill;         // (zombie) → gibs
-    this.onFatExplode = onFatExplode; // (x, z) → onda + daño en área
+    this.onFatExplode = onFatExplode; // (x, z) → onda + daño en área (FX del gordo)
+    this.onChainKill = onChainKill;   // (zombie) → gib barato de un vecino muerto por la explosión
     this.onReachCar = onReachCar; // (zombie) → daño al carro / latch
     this.onDeath = onDeath;       // (zombie) → contador de kills (misiones/eventos)
     this.onWave = onWave;         // (n) → aviso de nueva oleada (HUD)
@@ -332,6 +333,7 @@ export class ZombieSystem {
         if (near) {
           this.onFatExplode?.(z.x, z.z, z.cfg);
           this.beginDeath(z, { explode: true });
+          this._chainKill(z.x, z.z, (z.cfg.explodeR || 5) * 1.15); // cadena barata
           continue;
         }
       } else if (Math.abs(z.z) < 1.6 && Math.abs(dx) < GAMEPLAY.lanes.width * 0.6) {
@@ -354,6 +356,7 @@ export class ZombieSystem {
       if (z.type === 'fat') {
         this.onFatExplode?.(z.x, z.z, z.cfg);   // explosión + gibs (solo gordos)
         this.beginDeath(z, { explode: true });
+        this._chainKill(z.x, z.z, (z.cfg.explodeR || 5) * 1.15); // cadena barata
       } else {
         this.beginDeath(z);                       // anim de muerte (cae)
       }
@@ -365,6 +368,22 @@ export class ZombieSystem {
     });
     z.hitFlash = 0.08;
     return false;
+  }
+
+  // Explosión del gordo: mata en área a los vecinos SIN cascada de FX ni recursión.
+  // Cada vecino solo hace su muerte normal (`beginDeath`) + un gib barato; los gordos
+  // NO vuelven a llamar onFatExplode (eso detonaba boom+audio+cámara por cada uno y
+  // causaba el pico de lag al reventar en cadena). Una sola pasada sobre `active`.
+  _chainKill(cx, cz, radius) {
+    const r2 = radius * radius;
+    for (const zt of this.active) {
+      if (!zt.active || zt.state === 'dying') continue;
+      const dx = zt.x - cx, dz = zt.z - cz;
+      if (dx * dx + dz * dz > r2) continue;
+      zt.hp = 0;
+      this.beginDeath(zt, { explode: zt.type === 'fat' }); // cuenta el kill (onDeath); sin FX pesado
+      this.onChainKill?.(zt);                              // gib barato (sin audio/boom/cámara)
+    }
   }
 
   // Inicia la muerte: los gordos explotan (gibs, ya disparados por el caller); el

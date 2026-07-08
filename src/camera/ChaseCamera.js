@@ -85,8 +85,22 @@ export class ChaseCamera {
     const maxX = ((GAMEPLAY.lanes.count - 1) / 2) * GAMEPLAY.lanes.width || 1;
     const edge = Math.min(1, Math.abs(lx) / maxX);
     const edge2 = Math.pow(edge, 1.4); // rampa suave: los carriles del medio ya se mueven algo
-    const followFrac = Math.min(0.95, cam.followX + (cam.followXEdge - cam.followX) * edge2 * this.backScale);
-    const lookFrac = Math.min(0.6, cam.lookFollowX + (cam.lookFollowXEdge - cam.lookFollowX) * edge2 * this.backScale);
+    // En dispositivos LARGOS (backScale>1) con cámara BAJA (altura < 8), en los carriles
+    // EXTREMOS (1 y 4) el coche se cortaba un poco. Seguimos MÁS —posición y mira— para
+    // encuadrarlo; en pantallas normales o cámara alta no cambia nada (tallEdge = 0).
+    const lowCam = cam.pos[1] < 8.0;
+    const tallEdge = lowCam ? (this.backScale - 1) * edge2 : 0;
+    const followCap = lowCam ? 0.99 : 0.95;
+    const followFrac = Math.min(followCap, cam.followX + (cam.followXEdge - cam.followX) * edge2 * this.backScale + tallEdge * 0.55);
+    let lookFrac = Math.min(0.72, cam.lookFollowX + (cam.lookFollowXEdge - cam.lookFollowX) * edge2 * this.backScale);
+    // Clave del recorte en los extremos de pantallas largas: la cámara APUNTABA al
+    // centro de la vía (lookFrac << followFrac) → el coche se iba al borde. Acercamos
+    // la MIRA al seguimiento de posición en el borde para CENTRAR el coche (los carriles
+    // del medio y las pantallas normales conservan el encuadre hacia el centro).
+    if (lowCam) {
+      const pull = Math.min(1, tallEdge * 3);
+      lookFrac += (followFrac - lookFrac) * pull;
+    }
 
     // Seguimiento parcial del carril, con suavizado propio de la cámara
     this.followX += (lx * followFrac - this.followX) * Math.min(1, dt * 6);

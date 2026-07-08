@@ -38,9 +38,12 @@ el mundo viaja hacia +Z. Sin shadow maps (sombra de contacto blob).
   biting/atropello. Muerte **procedural** (desplome con peso), explosión del gordo.
 - **Menos gordos**: si el sorteo saca `fat`, la mitad de las veces se reconvierte a
   runner/normal (`spawn()`), así no saturan la carretera.
-- **Explosión del gordo en cadena**: al estallar (`RunScene.onFatExplode`) mata a los zombis
-  dentro de `explodeR·1.15` (recorre `getTargets()` y les aplica `hit(z,99)`), además del
-  daño al carro si está muy cerca. Reacción en cadena satisfactoria.
+- **Explosión del gordo en cadena (optimizada)**: al estallar mata a los zombis dentro de
+  `explodeR·1.15`. El daño en área lo aplica `ZombieSystem._chainKill` en **una sola pasada
+  sobre `active`, sin recursión ni FX por vecino** (los vecinos solo hacen su muerte normal +
+  un gib barato vía `onChainKill`). Antes cada gordo vecino re-llamaba `onFatExplode`
+  (boom+audio+cámara+gibs) en cascada recursiva → **pico de lag** al reventar racimos de
+  gordos; ahora la cadena se ve pero no cuesta. Solo el gordo original hace el FX completo.
 - Animaciones FBX Mixamo reencauzadas al esqueleto Tripo — `src/zombies/ZombieAnimations.js`.
 - Rig procedural de respaldo — `src/zombies/ZombieRig.js`.
 
@@ -130,6 +133,14 @@ reintentar/salir.
 La cámara mira algo más arriba/cerca (se ve menos lo que viene). Sus parámetros (altura,
 distancia, mira, FOV, **inclinación/tilt**) se leen de un override en localStorage
 (`dh_run_camera`) y se editan en vivo desde el editor de partida.
+
+**Encuadre de los carriles EXTREMOS en dispositivos largos**: en pantallas angostas la cámara
+retrocede/sube (`backScale`), y en los carriles 1 y 4 el coche se cortaba un poco porque la
+**mira apuntaba al centro de la vía** (`lookFollowX` << `followX`) → el coche se iba al borde.
+Cuando la altura de cámara es **< 8.0** (`cam.pos[1]`), en los extremos de pantallas largas se
+sigue MÁS (posición `followFrac`→~0.99) y sobre todo la **mira se acerca al seguimiento de
+posición** (`lookFrac` se jala hacia `followFrac`) para **centrar el coche**. En pantallas
+normales, cámara alta o carriles del medio no cambia nada.
 
 ## 🛠️ Editor EN PARTIDA (modo dev) — `src/ui-hud/RunDevOverlay.js`
 
