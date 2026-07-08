@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { GAMEPLAY, laneCenterX } from '../config/gameplay.js';
 import { AssetLoader } from '../asset-pipeline/AssetLoader.js';
 import { normalizeModel } from '../utils/measure.js';
@@ -6,15 +7,62 @@ import { normalizeModel } from '../utils/measure.js';
 // Tráfico EN CONTRAVÍA (el jugador va al revés): coches normales que vienen de
 // frente y hay que esquivar. Reutiliza la flota optimizada (ambulancias,
 // bomberos, minivan multicolor). Pool + colisión AABB por carril.
+//  · len     → largo objetivo (m). >6 ocupa 2 carriles.
+//  · stretch → estiramiento SOLO en el largo (world Z) tras normalizar: las
+//              ambulancias se ven más largas sin ensancharse ni crecer de alto.
+//  · emergency → lleva barra de luces roja/azul en el techo.
 const MODELS = [
-  { url: '/models/traffic/ambulance_a.glb', len: 5.2, count: 3 },
-  { url: '/models/traffic/ambulance_b.glb', len: 5.2, count: 2 },
-  { url: '/models/traffic/ambulance_c.glb', len: 5.2, count: 2 },
-  { url: '/models/traffic/firetruck_a.glb', len: 7.5, count: 2 },
-  { url: '/models/traffic/firetruck_b.glb', len: 7.5, count: 1 },
-  { url: '/models/traffic/firetruck_c.glb', len: 7.5, count: 1 },
+  { url: '/models/traffic/ambulance_a.glb', len: 5.2, count: 3, stretch: 1.3, emergency: true },
+  { url: '/models/traffic/ambulance_b.glb', len: 5.2, count: 2, stretch: 1.3, emergency: true },
+  { url: '/models/traffic/ambulance_c.glb', len: 5.2, count: 2, stretch: 1.3, emergency: true },
+  { url: '/models/traffic/firetruck_a.glb', len: 7.5, count: 2, emergency: true },
+  { url: '/models/traffic/firetruck_b.glb', len: 7.5, count: 1, emergency: true },
+  { url: '/models/traffic/firetruck_c.glb', len: 7.5, count: 1, emergency: true },
   { url: '/models/traffic/minivan.glb', len: 4.6, count: 7, tintable: true }
 ];
+
+// Material único (unlit → se ve "encendido") compartido por todas las luces/detalles
+// del tráfico. vertexColors: cada caja lleva su color horneado en la geometría, así
+// TODO el detalle de un vehículo entra en UN solo draw call (barra + faros + traseras).
+const DETAIL_MAT = new THREE.MeshBasicMaterial({ vertexColors: true });
+
+// Cajita con color por-vértice, ya trasladada a (x,y,z). Se fusionan varias en una.
+function coloredBox(w, h, d, x, y, z, hex) {
+  const g = new THREE.BoxGeometry(w, h, d);
+  g.translate(x, y, z);
+  const col = new THREE.Color(hex);
+  const n = g.getAttribute('position').count;
+  const arr = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { arr[i * 3] = col.r; arr[i * 3 + 1] = col.g; arr[i * 3 + 2] = col.b; }
+  g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+  return g;
+}
+
+// Añade detalle "encendido" (barra de emergencia + faros + luces traseras) como
+// UNA malla fusionada sobre el holder (frente = +Z). Barato: 1 draw call/vehículo.
+function addTrafficDetails(holder, def, box, sz) {
+  const halfW = sz.x * 0.5;
+  const front = box.max.z, rear = box.min.z;
+  const lowY = box.min.y + sz.y * 0.26;
+  const parts = [];
+  // Faros delanteros (blanco cálido) y luces traseras (rojo)
+  parts.push(coloredBox(0.26, 0.16, 0.1, halfW * 0.6, lowY, front - 0.02, 0xfff2cc));
+  parts.push(coloredBox(0.26, 0.16, 0.1, -halfW * 0.6, lowY, front - 0.02, 0xfff2cc));
+  parts.push(coloredBox(0.24, 0.16, 0.1, halfW * 0.62, lowY, rear + 0.02, 0xff2a1c));
+  parts.push(coloredBox(0.24, 0.16, 0.1, -halfW * 0.62, lowY, rear + 0.02, 0xff2a1c));
+  // Barra de emergencia roja/azul en el techo (ambulancias/bomberos)
+  if (def.emergency) {
+    const roofY = box.max.y + 0.06;
+    parts.push(coloredBox(halfW * 0.7, 0.12, 0.26, -halfW * 0.34, roofY, 0, 0xff2a1c));
+    parts.push(coloredBox(halfW * 0.7, 0.12, 0.26, halfW * 0.34, roofY, 0, 0x2a6bff));
+  }
+  const merged = mergeGeometries(parts, false);
+  parts.forEach((g) => g.dispose());
+  if (!merged) return;
+  const mesh = new THREE.Mesh(merged, DETAIL_MAT);
+  mesh.name = 'trafficDetails';
+  holder.add(mesh);
+}
 
 // Paleta de tintes para dar VARIEDAD de color al tráfico (cada vehículo distinto)
 const TRAFFIC_TINTS = [
@@ -51,6 +99,15 @@ export class TrafficSystem {
         const box = new THREE.Box3().setFromObject(inner);
         const sz = box.getSize(new THREE.Vector3());
         inner.rotation.y = (sz.x > sz.z * 1.2 ? Math.PI / 2 : 0) + Math.PI;
+
+        // Detalle "encendido" (barra de emergencia + faros/traseras) medido tras
+        // orientar. Cuelga del holder (world-aligned); luego estiramos el largo
+        // y el detalle se estira con el cuerpo (ambulancias más largas).
+        inner.updateMatrixWorld(true);
+        const vbox = new THREE.Box3().setFromObject(inner);
+        const vsz = vbox.getSize(new THREE.Vector3());
+        addTrafficDetails(holder, def, vbox, vsz);
+        if (def.stretch) holder.scale.z *= def.stretch;
 
         // Tinte de color + acabado semi-metálico para que la carretera tenga
         // vehículos variados y con mejor terminación (no planos/apagados).

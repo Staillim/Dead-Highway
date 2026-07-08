@@ -23,6 +23,7 @@ import { Gibs } from '../vfx/Gibs.js';
 import { Explosions } from '../vfx/Explosion.js';
 import { SpeedEffects } from '../vfx/SpeedEffects.js';
 import { RunHUD } from '../ui-hud/RunHUD.js';
+import { RunDevOverlay, devEnabled } from '../ui-hud/RunDevOverlay.js';
 import { PlayerState } from '../save/PlayerState.js';
 import { computeUpgradeStats } from '../save/UpgradeStats.js';
 import { awardRunRewards } from '../save/Rewards.js';
@@ -43,30 +44,32 @@ const DEBUG = new URLSearchParams(location.search).has('debug');
 // Equirect procedural para reflejos: cielo frío arriba, horizonte cálido, suelo
 // oscuro abajo y un hotspot de sol — contraste que "pinta" la carrocería.
 function makeDesertEnvTexture() {
+  // 512×256: env más nítido → reflejos "4K" en la carrocería (coste PMREM 1 sola vez)
+  const W = 512, H = 256;
   const c = document.createElement('canvas');
-  c.width = 256;
-  c.height = 128;
+  c.width = W;
+  c.height = H;
   const ctx = c.getContext('2d');
-  const g = ctx.createLinearGradient(0, 0, 0, 128);
-  g.addColorStop(0, '#6ea8e8');
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#5f9fe6');    // cielo un poco más profundo (más contraste)
   g.addColorStop(0.42, '#cfe2f5');
   g.addColorStop(0.52, '#ffd9a0');
-  g.addColorStop(0.6, '#b98a5c');
-  g.addColorStop(1, '#4a3824');
+  g.addColorStop(0.6, '#b0824f');
+  g.addColorStop(1, '#332616');    // suelo más oscuro → carrocería con más "punch"
   ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 256, 128);
-  // hotspot del sol + rebote suave opuesto
-  const sun = ctx.createRadialGradient(186, 38, 2, 186, 38, 30);
+  ctx.fillRect(0, 0, W, H);
+  // hotspot del sol + rebote suave opuesto (coordenadas escaladas a 512×256)
+  const sun = ctx.createRadialGradient(372, 76, 4, 372, 76, 62);
   sun.addColorStop(0, 'rgba(255,255,245,1)');
-  sun.addColorStop(0.3, 'rgba(255,240,200,0.7)');
+  sun.addColorStop(0.3, 'rgba(255,240,200,0.72)');
   sun.addColorStop(1, 'rgba(255,240,200,0)');
   ctx.fillStyle = sun;
-  ctx.fillRect(0, 0, 256, 128);
-  const bounce = ctx.createRadialGradient(60, 96, 4, 60, 96, 40);
+  ctx.fillRect(0, 0, W, H);
+  const bounce = ctx.createRadialGradient(120, 192, 8, 120, 192, 80);
   bounce.addColorStop(0, 'rgba(255,214,160,0.5)');
   bounce.addColorStop(1, 'rgba(255,214,160,0)');
   ctx.fillStyle = bounce;
-  ctx.fillRect(0, 0, 256, 128);
+  ctx.fillRect(0, 0, W, H);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
@@ -278,7 +281,8 @@ export class RunScene {
       root: document.getElementById('run-ui-root'),
       onPause: () => this.setPaused(true),
       onResume: () => this.setPaused(false),
-      onExit: () => this.endRun(),
+      onExit: () => this.quitToGarage(),
+      onRetry: () => this.retry(),
       onThrottle: (v) => { if (!this.controller.paused) this.controller.setThrottle(v); },
       onAbility: (kind) => { if (!this.controller.paused) this.abilities.trigger(kind); }
     });
@@ -287,6 +291,11 @@ export class RunScene {
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && this.mounted && !this.controller.paused) this.setPaused(true);
     });
+
+    // Editor de HUD/cámara EN PARTIDA (solo modo dev: ?dev o dh_dev==='1')
+    if (devEnabled()) {
+      this.devOverlay = new RunDevOverlay({ hud: this.hud, chaseCamera: this.chaseCamera });
+    }
 
     window.__runScene = this;
   }
@@ -556,17 +565,20 @@ export class RunScene {
     this.sun.color.copy(a.sun);
   }
 
-  endRun() {
-    if (this._ended) return; // evitar doble fin (sin gas + 0 hp)
+  // Persiste el resultado de la corrida (idempotente: solo una vez por partida) y
+  // devuelve el resumen para la pantalla de muerte. NO cambia de escena.
+  _finalizeRun() {
+    if (this._ended) return null; // evitar doble fin (sin gas + 0 hp)
     this._ended = true;
-    // Persistir progreso de la corrida en el estado del jugador
     const dist = Math.round(this.controller.distance);
     const kills = this.runKills || 0;
     const fatKills = this.runFatKills || 0;
     const gas = this.runGas || 0;
     const stats = this.state.stats || {};
+    const prevBest = stats.bestDistance || 0;
+    const isNewBest = dist > prevBest && dist > 0;
     stats.lastDistance = dist;
-    stats.bestDistance = Math.max(stats.bestDistance || 0, dist);
+    stats.bestDistance = Math.max(prevBest, dist);
     stats.runsPlayed = (stats.runsPlayed || 0) + 1;
     // Acumulados (misiones/eventos): kills, gordos, distancia total, bidones
     stats.totalKills = (stats.totalKills || 0) + kills;
@@ -591,7 +603,37 @@ export class RunScene {
     if (pg > 0) { this.state.gems = (this.state.gems || 0) + pg; this.lastRewards.gems += pg; }
     this.lastRewards.score = score;
     PlayerState.save(this.state);
+    return {
+      distance: dist, kills,
+      coins: Math.round(this.lastRewards.coins || 0),
+      gems: Math.round(this.lastRewards.gems || 0),
+      score, best: stats.bestDistance, isNewBest
+    };
+  }
+
+  // Fin por muerte / sin gasolina: congela el mundo y muestra la pantalla de muerte.
+  endRun() {
+    const r = this._finalizeRun();
+    if (!r) return;
+    this.controller.paused = true; // congelar el mundo detrás de la pantalla
+    this.hud.showGameOver(r);
+  }
+
+  // Salir al garaje (botón de pausa o de la pantalla de muerte): persiste si hacía
+  // falta y vuelve al lobby.
+  quitToGarage() {
+    this._finalizeRun();
     this.onExit?.();
+  }
+
+  // Reintentar sin volver al garaje: rebobina la corrida y reanuda.
+  async retry() {
+    this.hud.hideGameOver();
+    await this.reset();
+    this.controller.paused = false;
+    this.hud.setHearts(this.hp, this.maxHp);
+    this.hud.setShield(this.shield, this.shieldMax);
+    this.hud.setCombo(0, 1, 0);
   }
 
   update(dt) {
@@ -674,7 +716,11 @@ export class RunScene {
     const h = this.container.clientHeight;
     if (!w || !h) return;
     this.engine.renderer.setSize(w, h);
-    this.engine.renderer.setPixelRatio(Math.min(window.devicePixelRatio, GAMEPLAY.budget.dprMax));
+    // En móvil (puntero grueso) capamos el DPR a 1.5: casi idéntico a 2x pero
+    // ~30-40% menos fragmentos → devuelve el margen que consume el PBR del asfalto.
+    const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    const cap = coarse ? Math.min(1.5, GAMEPLAY.budget.dprMax) : GAMEPLAY.budget.dprMax;
+    this.engine.renderer.setPixelRatio(Math.min(window.devicePixelRatio, cap));
     this.chaseCamera.resize(w / h);
   }
 }

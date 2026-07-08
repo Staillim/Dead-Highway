@@ -87,7 +87,8 @@ export const GAMEPLAY = {
     fov: 62,               // FOV vertical alto: encuadre portrait
     fovBoost: 5,           // apertura extra a velocidad máxima
     pos: [0, 6.5, 10.5],
-    lookAt: [0, 1.2, -14],
+    lookAt: [0, 1.55, -12],// mira algo más arriba/cerca → se ve MENOS lo que viene (más tensión)
+    tilt: 0,               // inclinación extra hacia abajo (grados); editable en modo dev
     followX: 0.3,          // fracción del carril que sigue la cámara
     lookFollowX: 0.12,
     shakeMax: 0.022

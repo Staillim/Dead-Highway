@@ -10,13 +10,14 @@ const PAUSE_ICON =
 // HUD DOM de la partida: distancia + velocidad (throttled) y overlay de pausa.
 // DOM puro = 0 draw calls; reutiliza los tokens CSS del lobby.
 export class RunHUD {
-  constructor({ root, onPause, onResume, onExit, onThrottle, onAbility }) {
+  constructor({ root, onPause, onResume, onExit, onThrottle, onAbility, onRetry }) {
     this.root = root;
     this.onPause = onPause;
     this.onResume = onResume;
     this.onExit = onExit;
     this.onThrottle = onThrottle;
     this.onAbility = onAbility;
+    this.onRetry = onRetry;
     this.acc = 0;
     this.mountedOnce = false;
   }
@@ -64,6 +65,22 @@ export class RunHUD {
             <button class="btn-exit" data-action="exit">SALIR AL GARAJE</button>
           </div>
         </div>
+        <div id="run-gameover" hidden>
+          <div class="go-backdrop"></div>
+          <div class="go-card">
+            <div class="go-title">DESTRUIDO</div>
+            <div class="go-sub">Fin del recorrido</div>
+            <div class="go-hero"><b id="go-distance">0 m</b><span id="go-best"></span></div>
+            <div class="go-stats">
+              <div class="go-stat"><span class="go-ic">☠️</span><b id="go-kills">0</b><small>ZOMBIS</small></div>
+              <div class="go-stat"><span class="go-ic">🪙</span><b id="go-coins">0</b><small>MONEDAS</small></div>
+              <div class="go-stat"><span class="go-ic">💎</span><b id="go-gems">0</b><small>GEMAS</small></div>
+              <div class="go-stat"><span class="go-ic">🔥</span><b id="go-score">0</b><small>PUNTOS</small></div>
+            </div>
+            <button class="go-retry" data-action="retry">REINTENTAR</button>
+            <button class="go-exit" data-action="exit">SALIR AL GARAJE</button>
+          </div>
+        </div>
       `;
       this.root.addEventListener('click', (e) => {
         const el = e.target.closest('[data-action], #run-pause-btn');
@@ -71,6 +88,7 @@ export class RunHUD {
         if (el.id === 'run-pause-btn') this.onPause?.();
         else if (el.dataset.action === 'resume') this.onResume?.();
         else if (el.dataset.action === 'exit') this.onExit?.();
+        else if (el.dataset.action === 'retry') this.onRetry?.();
       });
       this.el = {
         hearts: this.root.querySelector('#run-hearts'),
@@ -92,7 +110,14 @@ export class RunHUD {
         fuelFill: this.root.querySelector('#run-fuel-fill'),
         pause: this.root.querySelector('#run-pause'),
         pauseDist: this.root.querySelector('#pause-distance'),
-        pauseBest: this.root.querySelector('#pause-best')
+        pauseBest: this.root.querySelector('#pause-best'),
+        gameover: this.root.querySelector('#run-gameover'),
+        goDist: this.root.querySelector('#go-distance'),
+        goBest: this.root.querySelector('#go-best'),
+        goKills: this.root.querySelector('#go-kills'),
+        goCoins: this.root.querySelector('#go-coins'),
+        goGems: this.root.querySelector('#go-gems'),
+        goScore: this.root.querySelector('#go-score')
       };
 
       // Botón AVANZAR: mantener = acelerar (pointer = touch+mouse) o tecla W / ↑
@@ -120,6 +145,40 @@ export class RunHUD {
       this.mountedOnce = true;
     }
     this.hidePause();
+    this.applyLayout();
+  }
+
+  // Aplica el layout del HUD guardado en el modo dev (posiciones editables de los
+  // indicadores). Sin layout guardado, cada elemento conserva su posición del CSS.
+  // Las posiciones se guardan como centro en % del viewport → responsive.
+  applyLayout(layout) {
+    if (layout === undefined) {
+      try { layout = JSON.parse(localStorage.getItem('dh_hud_layout') || 'null'); } catch (e) { layout = null; }
+    }
+    const ids = ['run-score', 'run-distance', 'run-hearts', 'run-speed', 'run-combo', 'run-wave'];
+    for (const id of ids) {
+      const el = this.root.querySelector('#' + id);
+      if (!el) continue;
+      const pos = layout && layout[id];
+      if (pos && typeof pos.xPct === 'number') {
+        el.style.position = 'absolute';
+        el.style.left = pos.xPct + '%';
+        el.style.top = pos.yPct + '%';
+        el.style.right = 'auto';
+        el.style.bottom = 'auto';
+        el.style.justifySelf = 'auto';
+        // El combo conserva su leve rotación; el resto solo se centra en el punto
+        el.style.transform = id === 'run-combo'
+          ? 'translate(-50%, -50%) rotate(-5deg)'
+          : 'translate(-50%, -50%)';
+      } else {
+        // Sin override: limpiar estilos inline para volver al CSS
+        el.style.position = '';
+        el.style.left = el.style.top = el.style.right = el.style.bottom = '';
+        el.style.justifySelf = '';
+        el.style.transform = '';
+      }
+    }
   }
 
   update(snapshot) {
@@ -223,5 +282,27 @@ export class RunHUD {
 
   hidePause() {
     if (this.el) this.el.pause.hidden = true;
+  }
+
+  // Pantalla de muerte: resumen de la corrida (distancia, zombis, botín, puntos)
+  // r = { distance, kills, coins, gems, score, best, isNewBest }
+  showGameOver(r) {
+    if (!this.el?.gameover) return;
+    this.el.goDist.textContent = formatDistance(r.distance);
+    this.el.goBest.textContent = r.isNewBest ? '¡NUEVO RÉCORD!' : `Récord ${formatDistance(r.best)}`;
+    this.el.goBest.classList.toggle('record', !!r.isNewBest);
+    this.el.goKills.textContent = fmt(r.kills);
+    this.el.goCoins.textContent = fmt(r.coins);
+    this.el.goGems.textContent = fmt(r.gems);
+    this.el.goScore.textContent = fmt(r.score);
+    this.hidePause();
+    this.el.gameover.hidden = false;
+    this.el.gameover.classList.remove('show');
+    void this.el.gameover.offsetWidth;
+    this.el.gameover.classList.add('show');
+  }
+
+  hideGameOver() {
+    if (this.el?.gameover) this.el.gameover.hidden = true;
   }
 }

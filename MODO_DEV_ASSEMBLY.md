@@ -371,3 +371,20 @@ Convención: `position` en el espacio **local del `carModel`** (igual que los so
 heredan la normalización y el giro del holder. `PlayerVehicle` lee `extras` para
 aplicarlos (luces como PointLight/SpotLight, llantas como spinners, humo alimentando el
 `SmokeSystem`).
+
+---
+
+## Editor EN PARTIDA: HUD + Cámara
+
+Al abrir el Modo Dev queda activo `dh_dev='1'` (también sirve `?dev` en la URL). Entonces,
+**dentro de la partida** aparece un botón flotante **⚙** (arriba a la derecha) que abre el
+*Editor de partida* (`src/ui-hud/RunDevOverlay.js`):
+
+- **Cámara** — sliders de Altura, Distancia, Mira alto, Mira lejos, FOV e **Inclinación**.
+  Se aplican en vivo (`ChaseCamera.reloadConfig()`) y se guardan en `localStorage.dh_run_camera`.
+- **HUD** — con el editor abierto, los indicadores (puntos, distancia, corazones, combo,
+  oleada, velocidad) quedan marcados con borde punteado y se **arrastran** a la posición
+  deseada. **Guardar** persiste en `localStorage.dh_hud_layout`; `RunHUD.applyLayout()` los
+  reposiciona en cada partida (centro en % del viewport → responsive).
+- **Previews** — botones *Combo x5*, *Oleada* y *-1 vida* para ver cómo se ven los textos.
+- **Reset HUD** / **Reset cámara** vuelven a los valores por defecto de `gameplay.js`.

@@ -759,10 +759,14 @@ export class LobbyUI {
     this.toast('¡Hito reclamado!');
   }
 
-  // Abre el Modo Dev (Assembly Editor) con el carro equipado ya cargado
+  // Abre el Modo Dev (Assembly Editor) con el carro equipado ya cargado.
+  // Además arma el editor EN PARTIDA (HUD + cámara): al entrar aquí quedas en
+  // "modo dev", así al pulsar JUGAR aparece el botón ⚙ para editar la vista.
   openEditor() {
+    try { localStorage.setItem('dh_dev', '1'); } catch (e) {}
     const carId = this.state.equipped.carId;
     window.open(`/src/tools/assembly-editor/index.html?car=${encodeURIComponent(carId)}`, '_blank');
+    this.toast?.('Modo dev activo · en la partida verás el botón ⚙ para editar HUD/cámara');
   }
 
   selectUpgrade(key) {

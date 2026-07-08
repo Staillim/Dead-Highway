@@ -45,8 +45,12 @@ export class RoadSystem {
     this.rng = Math.random;
 
     const anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    // PBR barato (Standard) en vez de Lambert: el asfalto reacciona al sol y al
+    // env map (brillo/calor sutil) → se ve mucho menos plano/matte. Coste móvil
+    // despreciable (pocos materiales sobre planos grandes). El tinte de bioma
+    // sigue funcionando: usa .color, que Standard también soporta.
     this.materials = createRoadTextures({ anisotropy }).map(
-      (map) => new THREE.MeshLambertMaterial({ map })
+      (map) => new THREE.MeshStandardMaterial({ map, roughness: 0.82, metalness: 0.0, envMapIntensity: 0.35 })
     );
 
     // Geometría COMPARTIDA por todos los chunks
@@ -65,7 +69,7 @@ export class RoadSystem {
     // Material BLANCO: el tinte vive solo en la textura, así la banquina de la
     // carretera y el desierto comparten color exacto (sin corte visible).
     this.groundTex = createGroundTexture({ anisotropy });
-    const groundMat = new THREE.MeshLambertMaterial({ map: this.groundTex });
+    const groundMat = new THREE.MeshStandardMaterial({ map: this.groundTex, roughness: 0.95, metalness: 0.0, envMapIntensity: 0.15 });
     this.groundMaterial = groundMat; // expuesto para el tinte de bioma
     this.ground = new THREE.Mesh(new THREE.PlaneGeometry(...ground.size), groundMat);
     this.ground.rotation.x = -Math.PI / 2;

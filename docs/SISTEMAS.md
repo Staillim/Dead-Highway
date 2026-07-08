@@ -95,3 +95,44 @@ combustible** compacta. Abajo-der: botón **AVANZAR** ▲.
 
 Todos los tunables: velocidad, carriles, tráfico, zombis/oleadas, torreta/balas, fuel,
 combo, biomas, VFX, budget de draw calls.
+
+---
+
+## 💀 Pantalla de muerte — `RunHUD.showGameOver()` + `RunScene`
+
+Al morir (0 vidas o sin gasolina) `endRun()` congela el mundo y muestra el resumen:
+**distancia**, **zombis eliminados**, **monedas y gemas recogidas**, **puntos** y récord
+(con "¡NUEVO RÉCORD!"). Botones **REINTENTAR** (`RunScene.retry()` rebobina sin volver al
+garaje) y **SALIR AL GARAJE**. La persistencia vive en `_finalizeRun()` (idempotente).
+
+## 🎨 Tipografía + look 4K
+
+- **Fuente display "Road Rage"** (`--font-display` en `lobby.css`, `@font-face` que carga
+  `/fonts/road-rage.*` si existe; fallback condensado/pesado). Se usa en PUNTOS, COMBO,
+  OLEADA, velocidad, distancia y pantalla de muerte (italic = look racer).
+- **Combo** sin borde: sombras en capas + glow que respira (`combo-breathe`) → vivo aunque
+  esté estático. **Oleada** mucho más grande (72px).
+- **Iluminación**: carretera y suelo pasan de Lambert a **MeshStandardMaterial** (reaccionan
+  al sol + env map → asfalto menos plano). Env map a 512×256 con más contraste. DPR capado a
+  1.5 en móvil para compensar.
+
+## 🎥 Cámara editable — `ChaseCamera` + `dh_run_camera`
+
+La cámara mira algo más arriba/cerca (se ve menos lo que viene). Sus parámetros (altura,
+distancia, mira, FOV, **inclinación/tilt**) se leen de un override en localStorage
+(`dh_run_camera`) y se editan en vivo desde el editor de partida.
+
+## 🛠️ Editor EN PARTIDA (modo dev) — `src/ui-hud/RunDevOverlay.js`
+
+Con `?dev` en la URL o `dh_dev='1'` (se activa al abrir el Assembly Editor), aparece un botón
+**⚙** en la partida. Abre un panel para: **arrastrar los indicadores** del HUD (puntos,
+distancia, corazones, combo, oleada, velocidad) y guardarlos (`dh_hud_layout` → aplicado por
+`RunHUD.applyLayout()`); ajustar la **cámara** con sliders (aplica al instante vía
+`ChaseCamera.reloadConfig()`); y previsualizar combo / oleada / daño.
+
+## 🚑 Tráfico con detalle — `TrafficSystem`
+
+Las **ambulancias** se estiran solo en el largo (`stretch` → `holder.scale.z`, sin
+ensanchar). Todos los vehículos llevan **faros, luces traseras y barra de emergencia**
+(ambulancias/bomberos) horneados en UNA malla fusionada con `vertexColors` (1 draw call por
+vehículo, material unlit compartido).

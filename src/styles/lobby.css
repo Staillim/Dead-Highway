@@ -15,6 +15,21 @@
   --green: #3fc44f;
   --blue: #3f8ef2;
   --radius: 12px;
+  /* Fuente display "Road Rage" (arcade/racer) para marcadores y titulares del
+     HUD. Se auto-aloja en /fonts (assets/fonts); si el archivo no está aún, cae
+     en un stack condensado/pesado que conserva la energía agresiva. */
+  --font-display: 'Road Rage', 'Bahnschrift Condensed', 'Arial Narrow', Impact, 'Haettenschweiler', 'Franklin Gothic Bold', system-ui, sans-serif;
+}
+
+/* La fuente real Road Rage se activa sola al dejar el archivo en assets/fonts/
+   (road-rage.woff2 y/o road-rage.ttf). Sin él, el fallback de --font-display
+   mantiene el look. font-display: swap → nunca bloquea el render. */
+@font-face {
+  font-family: 'Road Rage';
+  src: url('/fonts/road-rage.woff2') format('woff2'),
+       url('/fonts/road-rage.ttf') format('truetype');
+  font-weight: 400 900;
+  font-display: swap;
 }
 
 * {
