@@ -40,6 +40,7 @@ import { FloatingText } from '../vfx/FloatingText.js';
 import { MissileVisual } from '../vfx/MissileVisual.js';
 import { computeFuelMax } from '../save/ShopFuelUpgrade.js';
 import { carById } from '../vehicles/VehicleConfig.js';
+import { turretStatsById } from '../vehicles/TurretData.js';
 
 const DEBUG = new URLSearchParams(location.search).has('debug');
 
@@ -101,7 +102,15 @@ export class RunScene {
     this.maxHp = st.maxHp + (carPower >= 1.4 ? 2 : carPower >= 1.2 ? 1 : 0); // coches potentes: +corazón
     this.hp = this.maxHp;
     this.controller.speedMul = st.speedMul * (0.85 + carPower * 0.15);
-    this.turret.setStats({ damage: Math.round(st.turretDamage * carPower), fireRate: GAMEPLAY.turret.fireRate * st.turretFireRateMul });
+    // Torreta equipada: alcance/daño/cadencia dependen de la torreta (una mejor que
+    // otra) y encima aplican las mejoras del garaje (nivel de torreta = +bonus).
+    const tStats = turretStatsById(this.state.equipped?.turret);
+    const tUpBonus = 1 + (this.state.upgrades?.turret || 0) * 0.03;
+    this.turret.setStats({
+      damage: Math.round(st.turretDamage * carPower * tStats.damageMul),
+      fireRate: GAMEPLAY.turret.fireRate * st.turretFireRateMul * tStats.fireRateMul,
+      range: GAMEPLAY.turret.range * tStats.rangeMul * tUpBonus
+    });
     // Munición desbloqueada por el nivel de la torreta (override dev: ?ammo=explosive)
     const ammoOverride = new URLSearchParams(location.search).get('ammo');
     this.turret.setBulletType(ammoOverride && GAMEPLAY.turret.bulletTypes[ammoOverride] ? ammoOverride : st.ammoType);
@@ -396,8 +405,19 @@ export class RunScene {
 
   setPaused(v) {
     this.controller.setPaused(v);
-    if (v) { this.controller.setThrottle(0); this.hud.showPause(this.controller.snapshot()); }
-    else this.hud.hidePause();
+    if (v) {
+      this.controller.setThrottle(0);
+      this.hud.showPause(this.controller.snapshot());
+      // Cortar el motor y sirenas para que el audio NO quede "pegado" droneando en
+      // pausa / al ocultar la pestaña, y bajar el general.
+      audio.stopEngine();
+      audio.stopAllSirens();
+      audio.duck(0.4);
+    } else {
+      this.hud.hidePause();
+      audio.unduck();
+      if (!this._ended) audio.startEngine();
+    }
   }
 
   // Monta faros/traseras sobre el carro actual (hijos del holder → siguen al carro)

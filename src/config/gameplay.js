@@ -162,7 +162,7 @@ export const GAMEPLAY = {
 
   // Torreta automática (GDD §5): apunta al zombi más cercano en rango y dispara sola
   turret: {
-    range: 140,            // alcance de detección en Z (dispara más lejos)
+    range: 105,            // alcance BASE en Z (cada torreta lo multiplica; no tan lejos)
     fireRate: 10,          // disparos por segundo
     projectileSpeed: 165,  // m/s
     damage: 1,

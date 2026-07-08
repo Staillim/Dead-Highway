@@ -418,12 +418,19 @@ export class LobbyUI {
           </div>
         `;
       }
+      const dmgPct = Math.round(((t.damageMul || 1) - 1) * 100);
+      const rngPct = Math.round(((t.rangeMul || 1) - 1) * 100);
+      const sign = (n) => (n >= 0 ? '+' : '') + n + '%';
       return `
         <button class="car-card ${equipped ? 'equipped' : ''} ${t.unlocked ? '' : 'locked'}"
                 data-action="turret" data-id="${t.id}">
           <span class="car-name">${t.name}</span>
           <div class="car-thumb" style="color:${color}; display:flex; align-items:center; justify-content:center;">
             <span style="font-size:38px; line-height:1;">${turretIcon}</span>
+          </div>
+          <div class="car-power">
+            <span class="stars">${this.stars(t.rarity || 1)}</span>
+            <b>⚔ ${sign(dmgPct)} · ◎ ${sign(rngPct)}</b>
           </div>
           ${footer}
         </button>

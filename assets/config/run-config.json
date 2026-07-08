@@ -18,12 +18,12 @@
       "master": 0.05,
       "engine": 0.05,
       "sfx": 0.05,
-      "siren": 0.05,
+      "siren": 0.2,
       "zombie": 0.05
     },
     "car": {
       "base": 40,
-      "type": "sawtooth",
+      "type": "square",
       "rev": 1
     },
     "sirens": {

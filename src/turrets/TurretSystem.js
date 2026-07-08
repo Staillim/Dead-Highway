@@ -48,6 +48,7 @@ export class TurretSystem {
     const cfg = GAMEPLAY.turret;
     this.dmg = cfg.damage;      // sobreescribible por mejoras
     this.rate = cfg.fireRate;
+    this.range = cfg.range;     // alcance (Z) — depende de la torreta + mejoras
     // Tipo de bala activo (lo fija applyUpgrades según el nivel de la torreta)
     this.bulletKey = 'standard';
     this.bulletCfg = cfg.bulletTypes.standard;
@@ -113,9 +114,10 @@ export class TurretSystem {
     });
   }
 
-  setStats({ damage, fireRate } = {}) {
+  setStats({ damage, fireRate, range } = {}) {
     if (damage != null) this.dmg = damage;
     if (fireRate != null) this.rate = fireRate;
+    if (range != null) this.range = range;
   }
 
   // Cambia el tipo de bala (standard/rapid/piercing/heavy/explosive). Tiñe la
@@ -189,7 +191,7 @@ export class TurretSystem {
 
   pickTarget() {
     const targets = this.zombies.getTargets();
-    const range = GAMEPLAY.turret.range;
+    const range = this.range;
     let best = null;
     let bestD = Infinity;
     const px = this.vehicle.object3D.position.x;
