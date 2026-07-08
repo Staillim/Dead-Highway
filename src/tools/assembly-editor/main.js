@@ -1547,6 +1547,559 @@ function getMeshPath(root, target) {
   return parts.length > 0 ? parts.join('/') : null;
 }
 
+// --- Extras del carro: luces / humo / llantas --------------------------------
+// Objetos colocables por el dev que se MONTAN sobre el carModel (mismo espacio
+// LOCAL que un socket: posición/rotación en el frame crudo del GLB, rotación en
+// radianes, escala escalar). Al ser hijos del carModel, en la partida heredan la
+// normalización y el giro del holder igual que los accesorios. Se persisten en
+// socketData.extras = { lights:[], smoke:[], wheels:[] }.
+
+const BASE_WHEEL_R = 0.5;              // radio base de la rueda procedural (la escala afina)
+let _smokePuffTex = null;             // textura de humo compartida (lazy, 1 sola)
+function smokePuffTexture() { if (!_smokePuffTex) _smokePuffTex = dustPuffTexture(); return _smokePuffTex; }
+
+function emptyExtras() { return { lights: [], smoke: [], wheels: [] }; }
+
+// Saneado defensivo al cargar de JSON/localStorage (archivos viejos sin extras,
+// o campos corruptos) → siempre una estructura completa y con tipos correctos.
+function extraVec3(a, fb) {
+  return (Array.isArray(a) && a.length >= 3) ? [(+a[0] || 0), (+a[1] || 0), (+a[2] || 0)] : fb.slice();
+}
+function sanitizeLight(l) {
+  l = l || {};
+  return {
+    kind: l.kind === 'spot' ? 'spot' : 'point',
+    position: extraVec3(l.position, [0, 1, 0]),
+    rotation: extraVec3(l.rotation, [0, 0, 0]),
+    color: typeof l.color === 'string' ? l.color : '#ffffff',
+    intensity: typeof l.intensity === 'number' ? l.intensity : 8,
+    distance: typeof l.distance === 'number' ? l.distance : 8,
+    angle: typeof l.angle === 'number' ? l.angle : 0.6,
+    penumbra: typeof l.penumbra === 'number' ? l.penumbra : 0.3
+  };
+}
+function sanitizeSmoke(s) {
+  s = s || {};
+  return {
+    position: extraVec3(s.position, [0, 0.2, 0]),
+    rotation: extraVec3(s.rotation, [0, 0, 0]),
+    rate: typeof s.rate === 'number' ? s.rate : 18,
+    size: typeof s.size === 'number' ? s.size : 0.5,
+    color: typeof s.color === 'string' ? s.color : '#3a332e'
+  };
+}
+function sanitizeWheel(w) {
+  w = w || {};
+  return {
+    position: extraVec3(w.position, [0, 0.4, 0]),
+    rotation: extraVec3(w.rotation, [0, 0, 0]),
+    scale: (typeof w.scale === 'number' && w.scale > 0) ? w.scale : 1
+  };
+}
+function normalizeExtras(raw) {
+  const ex = emptyExtras();
+  if (!raw || typeof raw !== 'object') return ex;
+  if (Array.isArray(raw.lights)) ex.lights = raw.lights.map(sanitizeLight);
+  if (Array.isArray(raw.smoke)) ex.smoke = raw.smoke.map(sanitizeSmoke);
+  if (Array.isArray(raw.wheels)) ex.wheels = raw.wheels.map(sanitizeWheel);
+  return ex;
+}
+
+// Medida LOCAL del carro (cacheada): se usa para posicionar los extras nuevos en
+// un lugar razonable (faro adelante, escape atrás, rueda al costado).
+function getCarLocalBox() {
+  if (!state.carModel) return null;
+  if (!state._carLocalBox) state._carLocalBox = measureModel(state.carModel);
+  return state._carLocalBox;
+}
+
+function applyExtraTransform(obj, data) {
+  obj.position.set(...(data.position || [0, 0, 0]));
+  obj.rotation.set(...(data.rotation || [0, 0, 0]));
+  const s = (typeof data.scale === 'number' && data.scale > 0) ? data.scale : 1;
+  obj.scale.setScalar(s);
+}
+
+// --- Fábrica: LUZ (point/spot) ----------------------------------------------
+// El marcador (Group) es lo que agarra el gizmo; adentro cuelga la luz real, un
+// "handle" clicable coloreado y un helper de alcance (esfera para point, cono
+// para spot). Al cambiar de tipo se reconstruyen los internals.
+function buildLightInternals(marker, data) {
+  for (const k of ['light', 'helper', 'target', 'handle']) {
+    const o = marker.userData[k];
+    if (o) {
+      marker.remove(o);
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) o.material.dispose();
+    }
+    marker.userData[k] = null;
+  }
+  const color = new THREE.Color(data.color || '#ffffff');
+
+  const handle = new THREE.Mesh(
+    new THREE.SphereGeometry(0.09, 12, 12),
+    new THREE.MeshBasicMaterial({ color, fog: false })
+  );
+  handle.renderOrder = 999;
+  marker.add(handle);
+  marker.userData.handle = handle;
+
+  if (data.kind === 'spot') {
+    const light = new THREE.SpotLight(color, data.intensity ?? 8, data.distance ?? 8, data.angle ?? 0.6, data.penumbra ?? 0.3, 2);
+    light.position.set(0, 0, 0);
+    const target = new THREE.Object3D();
+    target.position.set(0, 0, -1);   // apunta por el -Z local del marcador
+    marker.add(target);
+    light.target = target;
+    marker.add(light);
+    marker.userData.light = light;
+    marker.userData.target = target;
+    // Cono unitario (ápice en el origen, boca hacia -Z) que luego se escala
+    const coneGeo = new THREE.ConeGeometry(1, 1, 20, 1, true);
+    coneGeo.translate(0, -0.5, 0);
+    coneGeo.rotateX(Math.PI / 2);
+    const helper = new THREE.Mesh(coneGeo, new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity: 0.25, fog: false, depthWrite: false }));
+    marker.add(helper);
+    marker.userData.helper = helper;
+  } else {
+    const light = new THREE.PointLight(color, data.intensity ?? 8, data.distance ?? 8, 2);
+    marker.add(light);
+    marker.userData.light = light;
+    const helper = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.SphereGeometry(1, 16, 10)),
+      new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.22, fog: false, depthWrite: false })
+    );
+    marker.add(helper);
+    marker.userData.helper = helper;
+  }
+  updateLightHelperScale(marker, data);
+}
+
+function updateLightHelperScale(marker, data) {
+  const helper = marker.userData.helper;
+  if (!helper) return;
+  const dist = data.distance ?? 8;
+  if (data.kind === 'spot') {
+    const r = Math.tan(data.angle ?? 0.6) * dist;
+    helper.scale.set(r, r, dist);
+  } else {
+    helper.scale.setScalar(dist);
+  }
+}
+
+function createLight(data) {
+  const marker = new THREE.Group();
+  marker.name = 'extraLight';
+  marker.userData.extraGroup = 'lights';
+  marker.userData.data = data;
+  buildLightInternals(marker, data);
+  applyExtraTransform(marker, data);
+  marker.traverse((o) => { o.userData.isExtra = true; });
+  return marker;
+}
+
+// --- Fábrica: HUMO (emisor) --------------------------------------------------
+// Marcador clicable + puffs (sprites) que suben en loop para LEER visualmente
+// que es un emisor (p.ej. un escape). Solo se guarda la posición/tunables.
+function createSmoke(data) {
+  const marker = new THREE.Group();
+  marker.name = 'extraSmoke';
+  marker.userData.extraGroup = 'smoke';
+  marker.userData.data = data;
+
+  const handle = new THREE.Mesh(
+    new THREE.SphereGeometry(0.08, 10, 10),
+    new THREE.MeshBasicMaterial({ color: 0x9aa0aa, fog: false })
+  );
+  marker.add(handle);
+
+  const tex = smokePuffTexture();
+  const puffs = [];
+  for (let i = 0; i < 4; i++) {
+    const mat = new THREE.SpriteMaterial({ map: tex, color: new THREE.Color(data.color || '#3a332e'), transparent: true, opacity: 0, depthWrite: false });
+    const sp = new THREE.Sprite(mat);
+    sp.userData.p = i / 4;    // fase escalonada
+    marker.add(sp);
+    puffs.push(sp);
+  }
+  marker.userData.puffs = puffs;
+
+  applyExtraTransform(marker, data);
+  marker.traverse((o) => { o.userData.isExtra = true; });
+  return marker;
+}
+
+// --- Fábrica: LLANTA (rueda procedural) -------------------------------------
+// Mismo neumático que PlayerVehicle.createProceduralWheels: cilindro oscuro (eje
+// en X) + rin metálico + cruz de rayos. El spinner (hijo) gira en preview para
+// ver cómo rodaría; el marcador (padre) es el que agarra el gizmo (transform
+// estable, sin contaminarse con el giro del preview).
+function buildWheelSpinner(r) {
+  const thick = r * 0.7;
+  const tireGeo = new THREE.CylinderGeometry(r, r, thick, 22); tireGeo.rotateZ(Math.PI / 2);
+  const hubGeo = new THREE.CylinderGeometry(r * 0.5, r * 0.5, thick * 1.08, 16); hubGeo.rotateZ(Math.PI / 2);
+  const spokeGeo = new THREE.BoxGeometry(thick * 1.1, r * 0.9, r * 0.16);
+  const tireMat = new THREE.MeshStandardMaterial({ color: 0x0e0f13, roughness: 0.88, metalness: 0.05 });
+  const hubMat = new THREE.MeshStandardMaterial({ color: 0xc2c7ce, roughness: 0.3, metalness: 0.8 });
+  const spokeMat = new THREE.MeshStandardMaterial({ color: 0x808690, roughness: 0.45, metalness: 0.6 });
+  const spinner = new THREE.Group();
+  spinner.add(new THREE.Mesh(tireGeo, tireMat));
+  spinner.add(new THREE.Mesh(hubGeo, hubMat));
+  const s1 = new THREE.Mesh(spokeGeo, spokeMat);
+  const s2 = new THREE.Mesh(spokeGeo, spokeMat); s2.rotation.x = Math.PI / 2;   // cruz de rayos
+  spinner.add(s1, s2);
+  return spinner;
+}
+
+function createWheel(data) {
+  const marker = new THREE.Group();
+  marker.name = 'extraWheel';
+  marker.userData.extraGroup = 'wheels';
+  marker.userData.data = data;
+  const spinner = buildWheelSpinner(BASE_WHEEL_R);
+  marker.add(spinner);
+  marker.userData.spinner = spinner;
+  applyExtraTransform(marker, data);
+  marker.traverse((o) => { o.userData.isExtra = true; });
+  return marker;
+}
+
+// --- Alta / baja / montaje de extras ----------------------------------------
+function addLightObject(data) { const m = createLight(data); state.carModel.add(m); state.extraObjects.lights.push(m); return m; }
+function addSmokeObject(data) { const m = createSmoke(data); state.carModel.add(m); state.extraObjects.smoke.push(m); return m; }
+function addWheelObject(data) { const m = createWheel(data); state.carModel.add(m); state.extraObjects.wheels.push(m); return m; }
+
+function addLight() {
+  if (!state.carModel) { alert('Primero seleccioná un carro.'); return; }
+  const box = getCarLocalBox();
+  const size = box.getSize(new THREE.Vector3());
+  const data = {
+    kind: 'point',
+    position: [-size.x * 0.28, box.min.y + size.y * 0.55, box.max.z * 0.92],   // faro delantero-izq
+    rotation: [0, 0, 0],
+    color: '#fff2c8',
+    intensity: 8,
+    distance: Math.max(4, size.z * 0.9),
+    angle: 0.6,
+    penumbra: 0.3
+  };
+  state.extras.lights.push(data);
+  addLightObject(data);
+  buildExtrasList();
+  selectExtra('lights', data);
+  updateJsonOutput();
+  autoSaveSockets();
+}
+
+function addSmoke() {
+  if (!state.carModel) { alert('Primero seleccioná un carro.'); return; }
+  const box = getCarLocalBox();
+  const size = box.getSize(new THREE.Vector3());
+  const data = {
+    position: [size.x * 0.3, box.min.y + size.y * 0.14, box.min.z * 0.96],   // escape trasero-der
+    rotation: [0, 0, 0],
+    rate: 18,
+    size: Math.max(0.3, size.y * 0.28),
+    color: '#3a332e'
+  };
+  state.extras.smoke.push(data);
+  addSmokeObject(data);
+  buildExtrasList();
+  selectExtra('smoke', data);
+  updateJsonOutput();
+  autoSaveSockets();
+}
+
+function addWheel() {
+  if (!state.carModel) { alert('Primero seleccioná un carro.'); return; }
+  const box = getCarLocalBox();
+  const size = box.getSize(new THREE.Vector3());
+  const wr = THREE.MathUtils.clamp(size.y * 0.22, 0.3, 0.7);
+  const data = {
+    position: [-size.x * 0.5, box.min.y + wr, box.max.z * 0.55],   // costado, apoyada en el piso
+    rotation: [0, 0, 0],
+    scale: wr / BASE_WHEEL_R
+  };
+  state.extras.wheels.push(data);
+  addWheelObject(data);
+  buildExtrasList();
+  selectExtra('wheels', data);
+  updateJsonOutput();
+  autoSaveSockets();
+}
+
+function disposeExtraObject(obj) {
+  if (transform.object === obj) transform.detach();
+  if (obj.parent) obj.parent.remove(obj);
+  // Disponer geometría/material de TODO (mesh, sprite y también el helper de
+  // alcance que es LineSegments). OJO: no disponemos el map del humo (textura
+  // compartida entre todos los emisores).
+  obj.traverse((o) => {
+    if (o.geometry) o.geometry.dispose();
+    const m = o.material;
+    if (Array.isArray(m)) m.forEach((x) => x && x.dispose());
+    else if (m) m.dispose();
+  });
+  const light = obj.userData.light;
+  if (light && typeof light.dispose === 'function') light.dispose();
+}
+
+function clearExtraObjects() {
+  for (const group of ['lights', 'smoke', 'wheels']) {
+    for (const obj of state.extraObjects[group]) disposeExtraObject(obj);
+    state.extraObjects[group] = [];
+  }
+  state.selectedExtra = null;
+  hideExtraControls();
+}
+
+function rebuildExtraObjects() {
+  clearExtraObjects();
+  if (!state.carModel) { buildExtrasList(); return; }
+  for (const data of state.extras.lights) addLightObject(data);
+  for (const data of state.extras.smoke) addSmokeObject(data);
+  for (const data of state.extras.wheels) addWheelObject(data);
+  buildExtrasList();
+}
+
+function removeExtra(group, data) {
+  const arr = state.extraObjects[group];
+  const idx = arr.findIndex((o) => o.userData.data === data);
+  if (idx >= 0) { disposeExtraObject(arr[idx]); arr.splice(idx, 1); }
+  const di = state.extras[group].indexOf(data);
+  if (di >= 0) state.extras[group].splice(di, 1);
+  if (state.selectedExtra && state.selectedExtra.data === data) {
+    state.selectedExtra = null;
+    hideExtraControls();
+    transform.detach();
+    if (state.accessoryModel) transform.attach(state.accessoryModel);
+  }
+  buildExtrasList();
+  updateJsonOutput();
+  autoSaveSockets();
+}
+
+// --- Selección de extras (comparte el gizmo con accesorios/muzzles) ----------
+function allExtraObjects() {
+  return [...state.extraObjects.lights, ...state.extraObjects.smoke, ...state.extraObjects.wheels];
+}
+
+function findExtraMarker(obj) {
+  let cur = obj;
+  while (cur) {
+    if (cur.userData && cur.userData.extraGroup) return cur;
+    cur = cur.parent;
+  }
+  return null;
+}
+
+function selectExtra(group, data) {
+  const obj = state.extraObjects[group].find((o) => o.userData.data === data);
+  if (!obj) return;
+  state.currentMuzzleIdx = -1; hideMuzzleControls(); buildMuzzleList();
+  state.selectedExtra = { group, data, object: obj };
+  transform.detach();
+  transform.attach(obj);
+  setTransformMode(currentTransformMode || 'translate');
+  buildExtrasList();
+  showExtraControls();
+}
+
+function deselectExtra() {
+  state.selectedExtra = null;
+  hideExtraControls();
+  transform.detach();
+  if (state.accessoryModel) transform.attach(state.accessoryModel);
+  buildExtrasList();
+}
+
+// Suelta la selección de extra cuando OTRO objeto se lleva el gizmo (accesorio,
+// muzzle, cilindro selector). No toca el gizmo: de eso se ocupa quien llama.
+function clearExtraSelectionUI() {
+  if (!state.selectedExtra) return;
+  state.selectedExtra = null;
+  hideExtraControls();
+  buildExtrasList();
+}
+
+// --- UI de extras ------------------------------------------------------------
+function exSetVal(id, v) { const el = document.getElementById(id); if (el) el.value = v; }
+function exSetText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
+function exNum(id) { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; }
+
+function buildExtrasList() {
+  const listEl = document.getElementById('extras-list');
+  if (!listEl) return;
+  listEl.innerHTML = '';
+  const groups = [
+    { key: 'lights', icon: '💡', color: '#fff2c8', label: 'Luz' },
+    { key: 'smoke', icon: '💨', color: '#9aa0aa', label: 'Humo' },
+    { key: 'wheels', icon: '🛞', color: '#808690', label: 'Rueda' }
+  ];
+  let total = 0;
+  for (const g of groups) {
+    state.extras[g.key].forEach((data, i) => {
+      total++;
+      const sel = state.selectedExtra && state.selectedExtra.data === data;
+      const item = document.createElement('div');
+      item.className = 'muzzle-item' + (sel ? ' active' : '');
+
+      const dot = document.createElement('span');
+      dot.className = 'muzzle-dot';
+      dot.style.background = g.color;
+      dot.style.boxShadow = '0 0 6px ' + g.color;
+      item.appendChild(dot);
+
+      const name = document.createElement('span');
+      name.className = 'muzzle-name';
+      const info = g.key === 'lights' ? ` · ${data.kind === 'spot' ? 'spot' : 'point'}` : '';
+      name.textContent = `${g.icon} ${g.label} ${i + 1}${info}`;
+      item.appendChild(name);
+
+      const rm = document.createElement('button');
+      rm.className = 'sg-item-rm';
+      rm.textContent = '×';
+      rm.title = 'Quitar';
+      rm.addEventListener('click', (e) => { e.stopPropagation(); removeExtra(g.key, data); });
+      item.appendChild(rm);
+
+      item.addEventListener('click', () => {
+        if (state.selectedExtra && state.selectedExtra.data === data) deselectExtra();
+        else selectExtra(g.key, data);
+      });
+      listEl.appendChild(item);
+    });
+  }
+  if (total === 0) listEl.innerHTML = '<div class="hint-small" style="margin:0;">Sin extras. Agregá luz, humo o rueda.</div>';
+}
+
+function hideExtraControls() { const c = document.getElementById('extra-controls'); if (c) c.style.display = 'none'; }
+
+function showExtraControls() {
+  const c = document.getElementById('extra-controls');
+  if (!c || !state.selectedExtra) { if (c) c.style.display = 'none'; return; }
+  const { group, data } = state.selectedExtra;
+  c.style.display = 'block';
+
+  exSetVal('ex-px', (data.position?.[0] || 0).toFixed(3));
+  exSetVal('ex-py', (data.position?.[1] || 0).toFixed(3));
+  exSetVal('ex-pz', (data.position?.[2] || 0).toFixed(3));
+  exSetVal('ex-rx', THREE.MathUtils.radToDeg(data.rotation?.[0] || 0).toFixed(1));
+  exSetVal('ex-ry', THREE.MathUtils.radToDeg(data.rotation?.[1] || 0).toFixed(1));
+  exSetVal('ex-rz', THREE.MathUtils.radToDeg(data.rotation?.[2] || 0).toFixed(1));
+
+  const scaleRow = document.getElementById('ex-scale-row');
+  if (scaleRow) scaleRow.style.display = (group === 'wheels') ? 'flex' : 'none';
+  if (group === 'wheels') exSetVal('ex-scale', (data.scale || 1).toFixed(3));
+
+  const lightBlock = document.getElementById('extra-light-block');
+  const smokeBlock = document.getElementById('extra-smoke-block');
+  if (lightBlock) lightBlock.style.display = (group === 'lights') ? 'flex' : 'none';
+  if (smokeBlock) smokeBlock.style.display = (group === 'smoke') ? 'flex' : 'none';
+
+  if (group === 'lights') {
+    exSetVal('el-kind', data.kind || 'point');
+    exSetVal('el-color', data.color || '#ffffff');
+    exSetVal('el-intensity', data.intensity ?? 8); exSetText('el-intensity-val', data.intensity ?? 8);
+    exSetVal('el-distance', data.distance ?? 8); exSetText('el-distance-val', data.distance ?? 8);
+    const angleRow = document.getElementById('el-angle-row');
+    if (angleRow) angleRow.style.display = (data.kind === 'spot') ? 'flex' : 'none';
+    exSetVal('el-angle', data.angle ?? 0.6); exSetText('el-angle-val', (data.angle ?? 0.6).toFixed(2));
+  }
+  if (group === 'smoke') {
+    exSetVal('sm-rate', data.rate ?? 18); exSetText('sm-rate-val', data.rate ?? 18);
+    exSetVal('sm-size', data.size ?? 0.5); exSetText('sm-size-val', (data.size ?? 0.5).toFixed(2));
+  }
+}
+
+function onExtraTransformInput() {
+  if (!state.selectedExtra) return;
+  const { group, data, object } = state.selectedExtra;
+  data.position = [exNum('ex-px'), exNum('ex-py'), exNum('ex-pz')];
+  data.rotation = [THREE.MathUtils.degToRad(exNum('ex-rx')), THREE.MathUtils.degToRad(exNum('ex-ry')), THREE.MathUtils.degToRad(exNum('ex-rz'))];
+  object.position.set(...data.position);
+  object.rotation.set(...data.rotation);
+  if (group === 'wheels') {
+    const sc = exNum('ex-scale');
+    data.scale = sc > 0 ? sc : 1;
+    object.scale.setScalar(data.scale);
+  }
+  updateJsonOutput();
+  autoSaveSockets();
+}
+
+function onLightPropInput() {
+  if (!state.selectedExtra || state.selectedExtra.group !== 'lights') return;
+  const { data, object } = state.selectedExtra;
+  const prevKind = data.kind;
+  data.kind = document.getElementById('el-kind').value;
+  data.color = document.getElementById('el-color').value;
+  data.intensity = parseFloat(document.getElementById('el-intensity').value) || 0;
+  data.distance = parseFloat(document.getElementById('el-distance').value) || 1;
+  data.angle = parseFloat(document.getElementById('el-angle').value) || 0.6;
+  exSetText('el-intensity-val', data.intensity);
+  exSetText('el-distance-val', data.distance);
+  exSetText('el-angle-val', data.angle.toFixed(2));
+  const angleRow = document.getElementById('el-angle-row');
+  if (angleRow) angleRow.style.display = (data.kind === 'spot') ? 'flex' : 'none';
+
+  if (data.kind !== prevKind) {
+    buildLightInternals(object, data);   // point <-> spot: reconstruir la luz
+    buildExtrasList();                   // refrescar la etiqueta point/spot
+  } else {
+    const light = object.userData.light;
+    if (light) {
+      light.color.set(data.color);
+      light.intensity = data.intensity;
+      light.distance = data.distance;
+      if (data.kind === 'spot') light.angle = data.angle;
+    }
+    if (object.userData.handle) object.userData.handle.material.color.set(data.color);
+    if (object.userData.helper) object.userData.helper.material.color.set(data.color);
+    updateLightHelperScale(object, data);
+  }
+  updateJsonOutput();
+  autoSaveSockets();
+}
+
+function onSmokePropInput() {
+  if (!state.selectedExtra || state.selectedExtra.group !== 'smoke') return;
+  const { data } = state.selectedExtra;
+  data.rate = parseFloat(document.getElementById('sm-rate').value) || 18;
+  data.size = parseFloat(document.getElementById('sm-size').value) || 0.5;
+  exSetText('sm-rate-val', data.rate);
+  exSetText('sm-size-val', data.size.toFixed(2));
+  updateJsonOutput();
+  autoSaveSockets();
+}
+
+// Preview en el loop: las ruedas giran (rodadura) y los puffs de humo suben.
+function updateExtrasPreview(dt) {
+  if (!dt) return;
+  for (const w of state.extraObjects.wheels) {
+    const sp = w.userData.spinner;
+    if (sp) sp.rotation.x -= dt * 3.2;
+  }
+  for (const s of state.extraObjects.smoke) {
+    const puffs = s.userData.puffs;
+    if (!puffs) continue;
+    const data = s.userData.data || {};
+    const rate = data.rate || 18;
+    const size = data.size || 0.5;
+    const speed = 0.35 + rate * 0.02;
+    const rise = 1.2 * (0.6 + size);
+    for (const pf of puffs) {
+      pf.userData.p += dt * speed;
+      if (pf.userData.p > 1) pf.userData.p -= 1;
+      const p = pf.userData.p;
+      pf.position.set(0, p * rise, 0);
+      const sc = (0.25 + p * 0.9) * size * 1.6;
+      pf.scale.set(sc, sc, sc);
+      pf.material.opacity = (1 - p) * 0.6;
+    }
+  }
+}
+
 // --- Eventos -------------------------------------------------------------------------------------------------------------------------------
 carSelect.addEventListener('change', (e) => selectCar(e.target.value));
 
@@ -1634,6 +2187,30 @@ document.getElementById('sg-turret')?.addEventListener('click', () => activateGr
 document.getElementById('sg-hood')?.addEventListener('click', () => activateGroupSelector('hoodPart'));
 document.getElementById('sg-add')?.addEventListener('click', () => addGroupSelection());
 document.getElementById('sg-done')?.addEventListener('click', () => finishGroupSelection());
+
+// Extras: luces / humo / llantas
+document.getElementById('add-light')?.addEventListener('click', addLight);
+document.getElementById('add-smoke')?.addEventListener('click', addSmoke);
+document.getElementById('add-wheel')?.addEventListener('click', addWheel);
+document.getElementById('extra-remove')?.addEventListener('click', () => {
+  if (state.selectedExtra) removeExtra(state.selectedExtra.group, state.selectedExtra.data);
+});
+['ex-px', 'ex-py', 'ex-pz', 'ex-rx', 'ex-ry', 'ex-rz', 'ex-scale'].forEach((id) => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', onExtraTransformInput);
+});
+['el-intensity', 'el-distance', 'el-angle'].forEach((id) => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', onLightPropInput);
+});
+['el-kind', 'el-color'].forEach((id) => {
+  const el = document.getElementById(id);
+  if (el) { el.addEventListener('input', onLightPropInput); el.addEventListener('change', onLightPropInput); }
+});
+['sm-rate', 'sm-size'].forEach((id) => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', onSmokePropInput);
+});
 
 window.addEventListener('keydown', (e) => {
   if (e.key === 't') setTransformMode('translate');
@@ -2129,6 +2706,7 @@ buildTabs();
 buildAssetList();
 updateSocketInputs();
 updateJsonOutput();
+buildExtrasList();
 
 // Si el lobby abrió el editor con ?car=<id>, cargar ese carro directo
 const carParam = new URLSearchParams(location.search).get('car');

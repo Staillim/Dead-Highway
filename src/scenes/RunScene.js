@@ -28,6 +28,9 @@ import { computeUpgradeStats } from '../save/UpgradeStats.js';
 import { awardRunRewards } from '../save/Rewards.js';
 import { applyRunToMissions } from '../save/Missions.js';
 import { RunPickups } from '../collectibles/RunPickups.js';
+import { NightMode } from '../vfx/NightMode.js';
+import { VehicleLights } from '../vfx/VehicleLights.js';
+import { SmokeSystem } from '../vfx/SmokeSystem.js';
 
 const DEBUG = new URLSearchParams(location.search).has('debug');
 
@@ -124,6 +127,8 @@ export class RunScene {
     // --- Capas del mundo ---
     this.sky = new SkyDome(this.scene);
     this.far = new FarBackdrop(this.scene);
+    // Modo noche / ciclo día-noche (luna + estrellas; oscurece sobre el bioma)
+    this.nightMode = new NightMode(this.scene, { renderer, hemi: this.hemi, sun: this.sun, sky: this.sky });
     // Obstáculos (bus ocasional) + TRÁFICO en contravía (hazard principal)
     this.obstacles = new ObstacleSystem(this.scene);
     this.traffic = new TrafficSystem(this.scene, { onCrash: () => this.onCrash() });
@@ -185,6 +190,11 @@ export class RunScene {
     this.laneSystem = new LaneSystem();
     this.vehicle = await PlayerVehicle.create(equipped);
     this.scene.add(this.vehicle.object3D);
+    // Faros/traseras del carro (encienden de noche) + humo del escape
+    this.vehicleLights = new VehicleLights(this.scene);
+    this._mountVehicleLights();
+    this.smoke = new SmokeSystem(this.scene);
+    this._mountVehicleSmoke();
     this.chaseCamera = new ChaseCamera();
     this.speedFx = new SpeedEffects(this.scene, this.chaseCamera.camera);
     this.scene.add(this.chaseCamera.camera); // los streaks son hijos de la cámara
@@ -282,6 +292,9 @@ export class RunScene {
     this.traffic.reset();
     this.pickups.reset();
     this.runPickups.reset();
+    this.nightMode.reset();
+    this.smoke.reset();
+    this.vehicleLights.setNight(0);
     this.runBonusCoins = 0; this.runBonusGems = 0;
     // Soltar zombis agarrados del carro antes de reciclar
     for (const z of this.latched) this.vehicle.object3D.remove(z.holder);
@@ -305,6 +318,8 @@ export class RunScene {
       this.scene.add(this.vehicle.object3D);
       this.turret.vehicle = this.vehicle;
       this.hoodWeapon.vehicle = this.vehicle;
+      this._mountVehicleLights();  // re-montar luces/humo sobre el carro nuevo
+      this._mountVehicleSmoke();
     }
   }
 
@@ -312,6 +327,22 @@ export class RunScene {
     this.controller.setPaused(v);
     if (v) { this.controller.setThrottle(0); this.hud.showPause(this.controller.snapshot()); }
     else this.hud.hidePause();
+  }
+
+  // Monta faros/traseras sobre el carro actual (hijos del holder → siguen al carro)
+  _mountVehicleLights() {
+    this.vehicleLights.clear?.();
+    const vw = this.vehicle.width, vl = this.vehicle.length;
+    this.vehicleLights.createFor(this.vehicle.object3D, {
+      front: [{ x: -vw * 0.3, y: 0.55, z: -vl * 0.5 }, { x: vw * 0.3, y: 0.55, z: -vl * 0.5 }],
+      rear: [{ x: -vw * 0.32, y: 0.62, z: vl * 0.5 }, { x: vw * 0.32, y: 0.62, z: vl * 0.5 }]
+    });
+  }
+
+  // Emisor de humo del escape (en mundo; su x sigue el carril en update)
+  _mountVehicleSmoke() {
+    this.smoke.clearEmitters();
+    this._exhaust = this.smoke.addEmitter({ x: 0, y: 0.35, z: this.vehicle.length * 0.5, rate: 8, scale: 0.7 });
   }
 
   // Cada zombi muerto: suma kill + combo. Encadenar sube el multiplicador.
@@ -549,6 +580,14 @@ export class RunScene {
       this.tumbleweeds.update(dt, speed * dt);
       this.tumbleweeds.collide(this.laneSystem.x, (x, z) => this.speedFx.burst(x, z, 8));
       this.applyBiome();
+      // Modo noche: ciclo día↔noche por distancia (se aplica SOBRE el bioma)
+      this._nightF = this.nightMode.factorForCycle(this.controller.distance, 5000, 0.45);
+      this.nightMode.apply(this._nightF);
+      // Luces del carro (encienden de noche) + humo del escape (arrastrado por la velocidad)
+      this.vehicleLights.setNight(this._nightF);
+      this.vehicleLights.update(dt);
+      if (this._exhaust) this._exhaust.x = this.vehicle.object3D.position.x + this.vehicle.width * 0.22;
+      this.smoke.update(dt, speed);
       // Combo: se rompe si dejás de matar durante la ventana
       if (this.comboTimer > 0) {
         this.comboTimer -= dt;
