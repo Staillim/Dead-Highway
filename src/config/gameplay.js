@@ -18,7 +18,8 @@ export const GAMEPLAY = {
     base: 16,            // m/s (~58 km/h)
     max: 42,             // m/s (~150 km/h)
     gainPerMeter: 0.008, // aceleración por distancia recorrida
-    boostMul: 1.35       // techo extra de velocidad al acelerar a fondo (pedal)
+    boostMul: 1.6,       // techo extra al acelerar (avanzar)
+    accelRate: 11        // m/s por segundo que gana al mantener AVANZAR (se acumula)
   },
 
   road: {

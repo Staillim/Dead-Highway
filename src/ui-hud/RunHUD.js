@@ -37,9 +37,8 @@ export class RunHUD {
           <svg class="fuel-ico" viewBox="0 0 24 24" fill="currentColor"><path d="M6 3h6a1 1 0 0 1 1 1v16H5V4a1 1 0 0 1 1-1zm1 2v4h4V5zm9.5 3.7L18 7.2v9.6a1.1 1.1 0 0 0 2.2 0V10a1.4 1.4 0 0 0-.5-1.1zM4 20h10v1.4H4z"/></svg>
           <div class="fuel-track"><div id="run-fuel-fill"></div></div>
         </div>
-        <button id="run-gas" aria-label="Acelerar">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l6 7h-4v4h-4v-4H6zM6 17h12v3H6z"/></svg>
-          <span>GAS</span>
+        <button id="run-gas" aria-label="Avanzar">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.5l8.5 9.5H15.2V20.5H8.8V13H3.5z"/></svg>
         </button>
         <div id="run-pause" hidden>
           <div class="pause-backdrop" data-action="resume"></div>
@@ -77,7 +76,7 @@ export class RunHUD {
         pauseBest: this.root.querySelector('#pause-best')
       };
 
-      // Pedal de aceleración: mantener presionado = acelerar (pointer = touch+mouse)
+      // Botón AVANZAR: mantener = acelerar (pointer = touch+mouse) o tecla W / ↑
       const gas = this.root.querySelector('#run-gas');
       if (gas) {
         const setThrottle = (v) => { this.onThrottle?.(v); gas.classList.toggle('pressed', v > 0); };
@@ -85,6 +84,14 @@ export class RunHUD {
         gas.addEventListener('pointerup', () => setThrottle(0));
         gas.addEventListener('pointercancel', () => setThrottle(0));
         gas.addEventListener('lostpointercapture', () => setThrottle(0));
+        // Teclado: W o flecha arriba = avanzar (sin spamear por autorepeat)
+        this._fwdKey = false;
+        window.addEventListener('keydown', (e) => {
+          if ((e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') && !this._fwdKey) { this._fwdKey = true; setThrottle(1); }
+        });
+        window.addEventListener('keyup', (e) => {
+          if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') { this._fwdKey = false; setThrottle(0); }
+        });
       }
 
       this.mountedOnce = true;

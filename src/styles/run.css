@@ -296,15 +296,9 @@
 }
 
 #run-gas svg {
-  width: 26px;
-  height: 26px;
-  margin-bottom: -2px;
-}
-
-#run-gas span {
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 1.5px;
+  width: 40px;
+  height: 40px;
+  filter: drop-shadow(0 1px 1px rgba(120, 70, 0, 0.4));
 }
 
 #run-gas.pressed {
