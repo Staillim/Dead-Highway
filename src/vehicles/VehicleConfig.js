@@ -26,12 +26,14 @@ export const CAR_MODEL_FILES = {
 // Catálogo de coches: solo el Destructor viene desbloqueado; el resto se COMPRA
 // (monedas o gemas). `power` es un multiplicador de stats que aplica la partida
 // (hp/daño/velocidad). El Tanker SWAT es PREMIUM (gemas) con las mejores stats.
+// `sound` = motor procedural por coche (base = Hz al ralentí, type = onda, rev = cuánto
+// sube el tono con la velocidad) → cada vehículo suena distinto. Editable en modo dev.
 export const GARAGE_CARS = [
-  { id: 'rugged_car_01', name: 'Destructor', color: '#e04a3a', price: null, power: 1.0, rarity: 1 },
-  { id: 'predator', name: 'Predator', color: '#9b4ddb', price: { coins: 8000 }, power: 1.08, rarity: 2 },
-  { id: 'thunder', name: 'Thunder', color: '#f2c21f', price: { coins: 16000 }, power: 1.15, rarity: 3 },
-  { id: 'raptor', name: 'Raptor', color: '#3f8ef2', price: { coins: 30000 }, power: 1.24, rarity: 4 },
-  { id: 'tanker', name: 'Tanker SWAT', color: '#6f9c4a', price: { gems: 350 }, power: 1.42, rarity: 5, premium: true }
+  { id: 'rugged_car_01', name: 'Destructor', color: '#e04a3a', price: null, power: 1.0, rarity: 1, sound: { base: 84, type: 'sawtooth', rev: 1.0 } },
+  { id: 'predator', name: 'Predator', color: '#9b4ddb', price: { coins: 8000 }, power: 1.08, rarity: 2, sound: { base: 120, type: 'sawtooth', rev: 1.35 } },
+  { id: 'thunder', name: 'Thunder', color: '#f2c21f', price: { coins: 16000 }, power: 1.15, rarity: 3, sound: { base: 74, type: 'square', rev: 0.95 } },
+  { id: 'raptor', name: 'Raptor', color: '#3f8ef2', price: { coins: 30000 }, power: 1.24, rarity: 4, sound: { base: 68, type: 'sawtooth', rev: 1.1 } },
+  { id: 'tanker', name: 'Tanker SWAT', color: '#6f9c4a', price: { gems: 350 }, power: 1.42, rarity: 5, premium: true, sound: { base: 62, type: 'square', rev: 0.85 } }
 ];
 
 // Coche(s) que el jugador tiene de arranque

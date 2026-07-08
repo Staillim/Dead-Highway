@@ -24,6 +24,8 @@ import { Explosions } from '../vfx/Explosion.js';
 import { SpeedEffects } from '../vfx/SpeedEffects.js';
 import { RunHUD } from '../ui-hud/RunHUD.js';
 import { RunDevOverlay, devEnabled } from '../ui-hud/RunDevOverlay.js';
+import { audio } from '../audio/AudioManager.js';
+import { getRunSounds } from '../config/RunConfig.js';
 import { PlayerState } from '../save/PlayerState.js';
 import { computeUpgradeStats } from '../save/UpgradeStats.js';
 import { awardRunRewards } from '../save/Rewards.js';
@@ -174,16 +176,19 @@ export class RunScene {
         this.score = (this.score || 0) + value;
         this.hud.setCombo(this.combo || 0, Math.min(GAMEPLAY.combo.maxMult, 1 + Math.floor((this.combo || 0) / GAMEPLAY.combo.killsPerTier)), this.score);
         this.floatingText.pop(x, 1.2, z, `+${value}`, 0xffcf3f);
+        audio.pickup('coin');
       },
       onGem: (value, x, z) => {
         this.runBonusGems = (this.runBonusGems || 0) + value; // se acredita en endRun
         this.floatingText.pop(x, 1.35, z, `+${value} 💎`, 0x39e6ff);
         this.chaseCamera.addImpulse(0.2);
+        audio.pickup('gem');
       },
       onMedkit: (x, z) => {
         if (this.hp < this.maxHp) { this.hp += 1; this.hud.setHearts(this.hp, this.maxHp); this.floatingText.pop(x, 1.35, z, '+1 ❤', 0x53e06b); }
         else this.floatingText.pop(x, 1.35, z, 'FULL', 0x53e06b);
         this.chaseCamera.addImpulse(0.3);
+        audio.pickup('life');
       }
     });
     await this.runPickups.load();
@@ -230,15 +235,17 @@ export class RunScene {
     this.floatingText = new FloatingText(this.scene);  // "+N" al recoger
     this.missileVisual = new MissileVisual(this.scene); // misil visible
     this.zombies = new ZombieSystem(this.scene, {
-      onKill: (z, gibbed) => this.gibs.burst(z.x, 0.8, z.z, z.cfg.tint, gibbed ? 8 : 5),
+      onKill: (z, gibbed) => { this.gibs.burst(z.x, 0.8, z.z, z.cfg.tint, gibbed ? 8 : 5); audio.zombieDeath(z.x, z.z); },
       onFatExplode: (x, z, cfg) => this.onFatExplode(x, z, cfg),
       onReachCar: (z) => this.tryLatch(z),
       onDeath: (z) => this.registerKill(z),
+      onScream: (x, z) => audio.zombieGroan(x, z),
       onWave: (n) => this.hud?.notifyWave?.(n)
     });
     await this.zombies.load();
     this.turret = new TurretSystem(this.scene, this.vehicle, this.zombies, {
-      onExplode: (x, z) => { this.explosions.boom(x, z); this.chaseCamera.addImpulse(0.5); this.speedFx.addImpact(0.4); }
+      onExplode: (x, z) => { this.explosions.boom(x, z); this.chaseCamera.addImpulse(0.5); this.speedFx.addImpact(0.4); },
+      onFire: (kind) => audio.gunshot(kind)
     });
     this.hoodWeapon = new HoodWeaponSystem(this.scene, this.vehicle, this.zombies);
     // Habilidades activas: misil (limpia zona) + EMP (aturde/frena tráfico)
@@ -252,6 +259,7 @@ export class RunScene {
           this.explosions.boom(tox + (Math.random() - 0.5) * 5, toz + (Math.random() - 0.5) * 5);
           this.chaseCamera.addImpulse(1.8);
           this.speedFx.addImpact(1.4);
+          audio.explosion(tox, toz);
         });
       },
       onEmp: () => { this.chaseCamera.addImpulse(1.2); this.speedFx.addImpact(1.0); }
@@ -317,10 +325,19 @@ export class RunScene {
     this.input.setEnabled(true);
     this.mounted = true;
     this.resize();
+
+    // AUDIO: config global guardada + sonido de motor propio de este coche + arrancar
+    audio.applyConfig(getRunSounds());
+    const carSound = carById(this.state.equipped?.carId)?.sound;
+    if (carSound) audio.setCarSound(carSound);
+    audio.startEngine();
+    if (this.hud.setMuted) this.hud.setMuted(!audio.enabled);
   }
 
   unmount() {
     this.mounted = false;
+    audio.stopEngine();
+    audio.stopAllSirens();
     this.input.setEnabled(false);
     document.body.classList.remove('mode-run');
   }
@@ -415,6 +432,7 @@ export class RunScene {
   // Golpe contra un obstáculo: pierde un corazón, sacude y frena; 0 → fin de run.
   // El ESCUDO (mejora) absorbe el golpe sin perder corazón y luego se recarga.
   onCrash() {
+    audio.impact(0, 0, 1.1);   // golpe: siempre suena (aunque el escudo aguante)
     if (this.shield > 0) {
       this.shield -= 1;
       this.shieldTimer = this.shieldRegenS;
@@ -523,6 +541,7 @@ export class RunScene {
     this.gibs.burst(x, 1.0, z, cfg.tint, 10);
     this.chaseCamera.addImpulse(1.8);
     this.speedFx.addImpact(1.5);
+    audio.explosion(x, z);
     // Solo daña si el carro está realmente cerca (se puede esquivar cambiando
     // de carril). El arador NO protege de la explosión (GDD §7).
     const dx = Math.abs(x - this.vehicle.object3D.position.x);
@@ -704,7 +723,10 @@ export class RunScene {
       }
       this.speedFx.update(dt, speed, this.vehicle);
       this.chaseCamera.update(dt, this.laneSystem, speed);
-      this.hud.update(this.controller.snapshot());
+      const snap = this.controller.snapshot();
+      this.hud.update(snap);
+      // Motor: el tono sube con la velocidad (esa subida ES el sonido de aceleración)
+      audio.setEngineSpeed(snap.kmh || 0, this.controller.throttleTarget || 0);
     }
 
     // En pausa se sigue renderizando (mundo congelado detrás del panel)

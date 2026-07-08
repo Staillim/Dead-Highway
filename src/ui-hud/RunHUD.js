@@ -1,5 +1,6 @@
 import { GAMEPLAY } from '../config/gameplay.js';
 import { getRunHudLayout } from '../config/RunConfig.js';
+import { audio } from '../audio/AudioManager.js';
 
 const fmt = (n) => Math.round(n).toLocaleString('en-US');
 // A partir del kilómetro se lee mejor en km ("4.24 km" en vez de "4,241 m")
@@ -29,6 +30,7 @@ export class RunHUD {
         <div id="run-hud">
           <div class="hud-group">
             <button id="run-pause-btn" aria-label="Pausa">${PAUSE_ICON}</button>
+            <button id="run-mute" aria-label="Sonido">🔊</button>
             <div class="run-chip" id="run-hearts">❤❤❤</div>
           </div>
           <div class="run-chip" id="run-score"><b id="run-score-val">0</b><small>PUNTOS</small></div>
@@ -94,6 +96,7 @@ export class RunHUD {
       });
       this.el = {
         hearts: this.root.querySelector('#run-hearts'),
+        mute: this.root.querySelector('#run-mute'),
         shield: this.root.querySelector('#run-shield'),
         shieldN: this.root.querySelector('#run-shield-n'),
         score: this.root.querySelector('#run-score-val'),
@@ -144,6 +147,9 @@ export class RunHUD {
       // Botones de habilidad (misil / EMP)
       this.el.abMissile?.addEventListener('pointerdown', (e) => { e.preventDefault(); this.onAbility?.('missile'); });
       this.el.abEmp?.addEventListener('pointerdown', (e) => { e.preventDefault(); this.onAbility?.('emp'); });
+
+      // Botón de sonido (mute/unmute) — arranca/reanuda el audio en el gesto
+      this.el.mute?.addEventListener('click', () => { audio.ensure(); this.setMuted(audio.toggleMute()); });
 
       this.mountedOnce = true;
     }
@@ -222,6 +228,8 @@ export class RunHUD {
   notifyWave(n) {
     if (!this.el?.wave) return;
     this.el.waveN.textContent = n;
+    // Cuantas más oleadas, más saturado/contrastado el banner (sube leve, con tope)
+    this.el.wave.style.setProperty('--wave-boost', Math.min(0.7, (n - 1) * 0.06).toFixed(2));
     this.el.wave.hidden = false;
     this.el.wave.classList.remove('show');
     void this.el.wave.offsetWidth;
@@ -237,7 +245,14 @@ export class RunHUD {
     if (combo >= 2 && mult >= 2) {
       this.el.combo.hidden = false;
       this.el.comboMult.textContent = `x${mult}`;
-      this.el.combo.dataset.tier = mult >= 6 ? 'hot' : mult >= 4 ? 'warm' : 'base';
+      this.el.combo.dataset.tier = mult >= 9 ? 'mega' : mult >= 6 ? 'hot' : mult >= 4 ? 'warm' : 'base';
+      // Después de x8: sube un toque el contraste/saturación (sutil, con tope) para que
+      // el combo se vea "más vivo" de ahí en adelante — crece leve con el multiplicador.
+      if (mult > 8) {
+        this.el.combo.style.setProperty('--combo-boost', Math.min(0.55, (mult - 8) * 0.05).toFixed(2));
+      } else {
+        this.el.combo.style.removeProperty('--combo-boost');
+      }
       this.el.combo.classList.remove('pop');
       void this.el.combo.offsetWidth;
       this.el.combo.classList.add('pop');
@@ -311,5 +326,12 @@ export class RunHUD {
 
   hideGameOver() {
     if (this.el?.gameover) this.el.gameover.hidden = true;
+  }
+
+  setMuted(muted) {
+    if (this.el?.mute) {
+      this.el.mute.textContent = muted ? '🔇' : '🔊';
+      this.el.mute.classList.toggle('muted', !!muted);
+    }
   }
 }

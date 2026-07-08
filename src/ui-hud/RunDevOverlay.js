@@ -1,5 +1,11 @@
 import { GAMEPLAY } from '../config/gameplay.js';
 import { CAMERA_OVERRIDE_KEY } from '../camera/ChaseCamera.js';
+import { audio } from '../audio/AudioManager.js';
+
+const VOL_FIELDS = [
+  { key: 'master', label: 'General' }, { key: 'engine', label: 'Motor' },
+  { key: 'sfx', label: 'Disparos' }, { key: 'siren', label: 'Sirenas' }, { key: 'zombie', label: 'Zombis' }
+];
 
 // Editor EN PARTIDA (modo dev): muestra el HUD real sobre el juego y permite
 //  · arrastrar los indicadores (puntos, distancia, corazones, combo, oleada,
@@ -75,6 +81,21 @@ export class RunDevOverlay {
         <button data-dev="wave">Oleada</button>
         <button data-dev="hit">-1 vida</button>
       </div>
+      <div class="dev-sec">SONIDOS</div>
+      <div id="dev-vol"></div>
+      <label class="dev-slider"><span>Motor Hz</span><input type="range" min="40" max="180" step="1" data-snd="base"><b></b></label>
+      <label class="dev-slider"><span>Onda</span>
+        <select data-snd="type"><option value="sawtooth">saw</option><option value="square">square</option><option value="triangle">tri</option><option value="sine">sine</option></select>
+        <b></b></label>
+      <div class="dev-row">
+        <button data-dev="snd-shot">🔫 Disparo</button>
+        <button data-dev="snd-boom">💥 Explosión</button>
+      </div>
+      <div class="dev-row">
+        <button data-dev="snd-groan">🧟 Gruñido</button>
+        <button data-dev="snd-siren">🚑 Sirena</button>
+        <button data-dev="snd-mute">🔇 Mute</button>
+      </div>
       <div class="dev-row">
         <button data-dev="save" class="dev-primary">Guardar</button>
         <button data-dev="reset-hud">Reset HUD</button>
@@ -105,6 +126,25 @@ export class RunDevOverlay {
       camWrap.appendChild(row);
     });
 
+    // Sliders de volumen (aplican en vivo)
+    const volWrap = panel.querySelector('#dev-vol');
+    VOL_FIELDS.forEach((f) => {
+      const val = audio.volumes[f.key] ?? 0.7;
+      const row = document.createElement('label');
+      row.className = 'dev-slider';
+      row.innerHTML = `<span>${f.label}</span><input type="range" min="0" max="1" step="0.05" value="${val}" data-vol="${f.key}"><b>${(+val).toFixed(2)}</b>`;
+      const input = row.querySelector('input'); const out = row.querySelector('b');
+      input.addEventListener('input', () => { out.textContent = (+input.value).toFixed(2); audio.setVolumes({ [f.key]: +input.value }); });
+      volWrap.appendChild(row);
+    });
+    // Motor del coche (base + onda) → cada coche suena distinto; editable en vivo
+    const baseInp = panel.querySelector('input[data-snd="base"]');
+    const typeSel = panel.querySelector('select[data-snd="type"]');
+    baseInp.value = audio.carSound.base; baseInp.nextElementSibling.textContent = audio.carSound.base;
+    typeSel.value = audio.carSound.type;
+    baseInp.addEventListener('input', () => { baseInp.nextElementSibling.textContent = baseInp.value; audio.setCarSound({ base: +baseInp.value }); });
+    typeSel.addEventListener('change', () => audio.setCarSound({ type: typeSel.value }));
+
     panel.addEventListener('click', (e) => {
       const b = e.target.closest('[data-dev]');
       if (!b) return;
@@ -116,6 +156,11 @@ export class RunDevOverlay {
       else if (a === 'combo') this.hud.setCombo(20, 5, 12480);
       else if (a === 'wave') this.hud.notifyWave(7);
       else if (a === 'hit') this._previewHit();
+      else if (a === 'snd-shot') { audio.ensure(); audio.gunshot('standard'); }
+      else if (a === 'snd-boom') { audio.ensure(); audio.explosion(0, -5); }
+      else if (a === 'snd-groan') { audio.ensure(); audio.zombieGroan(0, -5); }
+      else if (a === 'snd-siren') { audio.ensure(); audio.startSiren('dev-test', 'ambulance', 0, -4); setTimeout(() => audio.stopSiren('dev-test'), 2600); }
+      else if (a === 'snd-mute') { audio.ensure(); this.hud.setMuted?.(audio.toggleMute()); }
     });
   }
 
@@ -212,6 +257,7 @@ export class RunDevOverlay {
     const camera = {};
     this.panel.querySelectorAll('input[data-cam]').forEach((inp) => { camera[inp.dataset.cam] = +inp.value; });
     const hud = this.working;
+    const sounds = audio.toConfig();
     // Local (para este navegador, aplicación inmediata)
     try {
       localStorage.setItem(HUD_KEY, JSON.stringify(hud));
@@ -224,7 +270,7 @@ export class RunDevOverlay {
       const res = await fetch('/api/save-run-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ camera, hud })
+        body: JSON.stringify({ camera, hud, sounds })
       });
       const r = await res.json();
       global = !!r.ok;

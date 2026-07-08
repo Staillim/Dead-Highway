@@ -152,6 +152,22 @@ progresiva. El mapeo id→archivo vive en `CAR_MODEL_FILES` (VehicleConfig).
 - **Fuente Road Rage** (Youssef Habchi) instalada en `assets/fonts/road-rage.otf` y activa vía
   `--font-display`. ⚠️ Licencia: **uso personal**; para uso comercial hace falta licencia del autor.
 
+## 🔊 Audio procedural — `src/audio/AudioManager.js`
+
+Todo el sonido es **sintetizado con Web Audio** (sin archivos → cero descargas, editable):
+- **Motor** por coche (loop; el tono sube con la velocidad = sonido de aceleración). Cada
+  coche trae su `sound` en `GARAGE_CARS` (base Hz, onda, rev).
+- **Disparos** de torreta (por tipo de bala), **impactos**/choques, **explosiones**
+  (misil/gordo), **gruñido** y **muerte** de zombis, **pickups**.
+- **Sirenas** variadas (ambulancia/bombero/policía) para el tráfico de emergencia: loop
+  paneado por X y atenuado por distancia (se oyen llegar y pasar).
+- **Envolvente**: cada sfx se panea (StereoPanner) y baja de volumen con la distancia.
+- El AudioContext se crea/reanuda en el gesto de JUGAR (política de autoplay). Botón de
+  **mute** en el HUD (persistido).
+- **Editable en modo dev** (sección SONIDOS): volúmenes por bus, motor del coche (Hz/onda),
+  botones de prueba. Se **guarda GLOBAL** en `run-config.json` (`sounds`) y lo carga el juego
+  al arrancar (`RunConfig.getRunSounds` → `audio.applyConfig`).
+
 ## 🏜️ Arena tileable + tarjetas Survival Drive
 
 - Textura de suelo regenerada (1024²) con **rizos de duna periódicos** (senos de frecuencia

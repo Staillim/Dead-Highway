@@ -84,7 +84,7 @@ export class ChaseCamera {
     // coche no se salga del cuadro (crítico en pantallas angostas → escala backScale).
     const maxX = ((GAMEPLAY.lanes.count - 1) / 2) * GAMEPLAY.lanes.width || 1;
     const edge = Math.min(1, Math.abs(lx) / maxX);
-    const edge2 = edge * edge; // rampa: ~0 en el centro, 1 en los extremos
+    const edge2 = Math.pow(edge, 1.4); // rampa suave: los carriles del medio ya se mueven algo
     const followFrac = Math.min(0.95, cam.followX + (cam.followXEdge - cam.followX) * edge2 * this.backScale);
     const lookFrac = Math.min(0.6, cam.lookFollowX + (cam.lookFollowXEdge - cam.lookFollowX) * edge2 * this.backScale);
 

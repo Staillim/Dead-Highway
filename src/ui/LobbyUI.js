@@ -1,5 +1,6 @@
 import { ICONS, carSilhouette } from './icons.js';
 import { getCarThumbnail } from '../vehicles/CarThumbnails.js';
+import { audio } from '../audio/AudioManager.js';
 import { VEHICLE_UPGRADES, VEHICLE_STATS, GARAGE_CARS } from '../vehicles/VehicleConfig.js';
 import { TURRETS, TURRET_NAMES } from '../vehicles/TurretData.js';
 import { PlayerState } from '../save/PlayerState.js';
@@ -505,6 +506,7 @@ export class LobbyUI {
           this.setView('garage');
           break;
         case 'play':
+          audio.ensure(); // crear/reanudar el audio DENTRO del gesto (política de autoplay)
           if (this.onPlay) this.onPlay();
           else this.toast('🚧 El modo de juego llega en la siguiente fase');
           break;

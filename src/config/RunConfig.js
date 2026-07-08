@@ -25,6 +25,10 @@ export function getRunHudLayout() {
   return (_cache && _cache.hud) || null;
 }
 
+export function getRunSounds() {
+  return (_cache && _cache.sounds) || null;
+}
+
 export function isRunConfigLoaded() {
   return _loaded;
 }

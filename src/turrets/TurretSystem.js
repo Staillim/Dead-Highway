@@ -32,11 +32,12 @@ function resolveMeshGroup(model, paths) {
 }
 
 export class TurretSystem {
-  constructor(scene, vehicle, zombieSystem, { onExplode } = {}) {
+  constructor(scene, vehicle, zombieSystem, { onExplode, onFire } = {}) {
     this.scene = scene;
     this.vehicle = vehicle;
     this.zombies = zombieSystem;
     this.onExplode = onExplode;   // (x, z, r) → onda visual para balas explosivas
+    this.onFire = onFire;         // (kind) → sonido de disparo
     this.cooldown = 0;
     this.muzzleIdx = 0;
     this.muzzle = new THREE.Vector3();
@@ -236,6 +237,8 @@ export class TurretSystem {
     this.flash.scale.setScalar((1.7 + Math.random() * 0.5) * (bc.tracer || 1));
     this.recoil = 1;              // patea el cañón
     this.ejectCasing(muzzlePos);  // expulsa casquillo
+    // Sonido de disparo (el arma del jugador va centrada)
+    this.onFire?.(bc.explodeR ? 'explosive' : (bc.damageMul || 1) >= 2 ? 'heavy' : 'standard');
   }
 
   getCurrentBurstConfig() {

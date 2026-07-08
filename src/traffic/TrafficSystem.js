@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { GAMEPLAY, laneCenterX } from '../config/gameplay.js';
 import { AssetLoader } from '../asset-pipeline/AssetLoader.js';
 import { normalizeModel } from '../utils/measure.js';
+import { audio } from '../audio/AudioManager.js';
 
 // Tráfico EN CONTRAVÍA (el jugador va al revés): coches normales que vienen de
 // frente y hay que esquivar. Reutiliza la flota optimizada (ambulancias,
@@ -12,12 +13,12 @@ import { normalizeModel } from '../utils/measure.js';
 //              ambulancias se ven más largas sin ensancharse ni crecer de alto.
 //  · emergency → lleva barra de luces roja/azul en el techo.
 const MODELS = [
-  { url: '/models/traffic/ambulance_a.glb', len: 5.2, count: 3, stretch: 1.3, emergency: true },
-  { url: '/models/traffic/ambulance_b.glb', len: 5.2, count: 2, stretch: 1.3, emergency: true },
-  { url: '/models/traffic/ambulance_c.glb', len: 5.2, count: 2, stretch: 1.3, emergency: true },
-  { url: '/models/traffic/firetruck_a.glb', len: 7.5, count: 2, emergency: true },
-  { url: '/models/traffic/firetruck_b.glb', len: 7.5, count: 1, emergency: true },
-  { url: '/models/traffic/firetruck_c.glb', len: 7.5, count: 1, emergency: true },
+  { url: '/models/traffic/ambulance_a.glb', len: 5.2, count: 3, stretch: 1.3, emergency: true, siren: 'ambulance' },
+  { url: '/models/traffic/ambulance_b.glb', len: 5.2, count: 2, stretch: 1.3, emergency: true, siren: 'ambulance' },
+  { url: '/models/traffic/ambulance_c.glb', len: 5.2, count: 2, stretch: 1.3, emergency: true, siren: 'ambulance' },
+  { url: '/models/traffic/firetruck_a.glb', len: 7.5, count: 2, emergency: true, siren: 'firetruck' },
+  { url: '/models/traffic/firetruck_b.glb', len: 7.5, count: 1, emergency: true, siren: 'firetruck' },
+  { url: '/models/traffic/firetruck_c.glb', len: 7.5, count: 1, emergency: true, siren: 'firetruck' },
   { url: '/models/traffic/minivan.glb', len: 4.6, count: 7, tintable: true }
 ];
 
@@ -128,7 +129,7 @@ export class TrafficSystem {
         this.scene.add(holder);
         // ancho aproximado para colisión (2 carriles si es camión)
         const wideLanes = def.len > 6 ? 2 : 1;
-        this.pool.push({ holder, active: false, z: 0, lane: 0, wideLanes, hit: false, spin: 0 });
+        this.pool.push({ holder, active: false, z: 0, lane: 0, wideLanes, hit: false, spin: 0, emergency: !!def.emergency, siren: def.siren || null, id: this.pool.length, sirenOn: false });
       }
     }
   }
@@ -203,13 +204,28 @@ export class TrafficSystem {
       // tras el choque, gira descontrolado un momento
       if (v.hit) v.holder.rotation.y += v.spin * dt;
 
-      if (v.z > 34) { v.active = false; v.holder.visible = false; }
+      // SIRENA de emergencia: solo cuando el vehículo está cerca (z > -90). Se panea
+      // por x y se atenúa por distancia → se oye llegar de un lado y pasar. Cap = 3.
+      if (v.emergency) {
+        if (v.z > -90 && v.z < 30) {
+          if (!v.sirenOn) { audio.startSiren(v.id, v.siren, v.holder.position.x, v.z); v.sirenOn = true; }
+          else audio.updateSiren(v.id, v.holder.position.x, v.z);
+        } else if (v.sirenOn) {
+          audio.stopSiren(v.id); v.sirenOn = false;
+        }
+      }
+
+      if (v.z > 34) {
+        v.active = false; v.holder.visible = false;
+        if (v.sirenOn) { audio.stopSiren(v.id); v.sirenOn = false; }
+      }
     }
     return crash;
   }
 
   reset() {
-    for (const v of this.pool) { v.active = false; v.holder.visible = false; }
+    for (const v of this.pool) { v.active = false; v.holder.visible = false; if (v.sirenOn) { audio.stopSiren(v.id); v.sirenOn = false; } }
+    audio.stopAllSirens();
     this.lastSpawnZ = -Infinity;
   }
 }

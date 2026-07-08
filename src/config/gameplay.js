@@ -89,8 +89,8 @@ export const GAMEPLAY = {
     pos: [0, 6.5, 10.5],
     lookAt: [0, 1.55, -12],// mira algo más arriba/cerca → se ve MENOS lo que viene (más tensión)
     tilt: 0,               // inclinación extra hacia abajo (grados); editable en modo dev
-    followX: 0.3,          // fracción del carril que sigue la cámara en el CENTRO
-    followXEdge: 0.8,      // fracción en los carriles EXTREMOS (1 y 4): la cámara se corre
+    followX: 0.44,         // fracción del carril que sigue la cámara en el CENTRO (algo de movimiento)
+    followXEdge: 0.82,     // fracción en los carriles EXTREMOS (1 y 4): la cámara se corre
     lookFollowX: 0.12,
     lookFollowXEdge: 0.32, // el punto de mira también se corre en los extremos
     shakeMax: 0.022
@@ -137,14 +137,14 @@ export const GAMEPLAY = {
     waveMaxS: 3.0,
     crawlChance: 0.12,     // pocos se arrastran (no todos)
     screamChance: 0.35,    // solo algunos gritan al ver el coche
-    detectZ: 72,           // a esta distancia el zombi ve el coche y grita (scream)
-    engageZ: 50,           // a esta distancia deja de vagar y PERSIGUE al carro
+    detectZ: 80,           // a esta distancia el zombi ve el coche y grita (scream)
+    engageZ: 64,           // a esta distancia deja de vagar y PERSIGUE al carro (más decididos)
     wanderSpeed: 1.4,      // velocidad al deambular (m/s)
     screamHomingMul: 0.45, // antes de gritar avanza lento; tras gritar, a tope
     // curva de dificultad GDD §9: qué tipos según distancia
     unlock: { runner: 500, fat: 1500 },
     types: {
-      normal: { hp: 2, ownVel: 0.5, homingX: 2.0, scale: 1.0, tint: 0x93a06a, run: 0.7, dmg: 1 },
+      normal: { hp: 2, ownVel: 1.3, homingX: 2.7, scale: 1.0, tint: 0x93a06a, run: 0.7, dmg: 1 },
       runner: { hp: 1, ownVel: 8.0, homingX: 5.0, scale: 0.92, tint: 0xa8815a, run: 1.6, dmg: 1 },
       fat: { hp: 4, ownVel: -4.0, homingX: 0.8, scale: 1.25, tint: 0x74855a, run: 0.4, dmg: 2, explodeR: 5 }
     }
@@ -156,13 +156,13 @@ export const GAMEPLAY = {
     spawnChance: 0.85,     // más tráfico viniendo
     minGapZ: 26,           // más juntos (pero siempre con carril de escape)
     maxLanesBlocked: 3,    // nunca tapar los 4 carriles con tráfico
-    oncomingSpeed: 9,      // m/s adicionales sobre el flujo del mundo
+    oncomingSpeed: 13,     // m/s adicionales sobre el flujo del mundo (vienen más rápido)
     hitDepth: 2.4
   },
 
   // Torreta automática (GDD §5): apunta al zombi más cercano en rango y dispara sola
   turret: {
-    range: 100,            // alcance de detección en Z
+    range: 140,            // alcance de detección en Z (dispara más lejos)
     fireRate: 10,          // disparos por segundo
     projectileSpeed: 165,  // m/s
     damage: 1,

@@ -15,13 +15,14 @@ const TYPE_URLS = {
 // El mundo los trae hacia el carro; cada uno suma su locomoción y se dirige al
 // carril del jugador. La torreta los mata; los que llegan al carro hacen daño.
 export class ZombieSystem {
-  constructor(scene, { onKill, onFatExplode, onReachCar, onDeath, onWave } = {}) {
+  constructor(scene, { onKill, onFatExplode, onReachCar, onDeath, onWave, onScream } = {}) {
     this.scene = scene;
     this.onKill = onKill;         // (zombie) → gibs
     this.onFatExplode = onFatExplode; // (x, z) → onda + daño en área
     this.onReachCar = onReachCar; // (zombie) → daño al carro / latch
     this.onDeath = onDeath;       // (zombie) → contador de kills (misiones/eventos)
     this.onWave = onWave;         // (n) → aviso de nueva oleada (HUD)
+    this.onScream = onScream;     // (x, z) → gruñido/sonido al detectar el coche
     this.pool = [];
     this.active = [];
     // Estado de oleadas: arranca con una calma corta antes de la 1ª oleada
@@ -274,6 +275,7 @@ export class ZombieSystem {
         z.screaming = true;
         z.screamT = (this.clips.scream?.duration || 1) * 0.7;
         this.playAnim(z, 'scream', { once: true });
+        this.onScream?.(z.x, z.z);   // gruñido posicional
       }
 
       if (z.screaming) {

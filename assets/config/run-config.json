@@ -1,4 +1,16 @@
 {
-  "camera": {},
-  "hud": {}
+  "camera": {
+    "posY": 3.9,
+    "posZ": 12.6,
+    "lookY": 0.5,
+    "lookZ": -4,
+    "fov": 62,
+    "tilt": 3
+  },
+  "hud": {
+    "run-score": {
+      "xPct": 47.48,
+      "yPct": 13.76
+    }
+  }
 }
