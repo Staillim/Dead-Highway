@@ -8,6 +8,11 @@ const formatDistance = (m) => (m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${fm
 
 const PAUSE_ICON =
   '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4h4v16H7zM13 4h4v16h-4z"/></svg>';
+// Iconos de sonido (altavoz con ondas / altavoz tachado) — SVG limpios, no emoji
+const SOUND_ON =
+  '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 9v6h3.6L12 19V5L7.6 9H4zm11.5 3a4 4 0 0 0-2.3-3.6v7.2A4 4 0 0 0 15.5 12zM13.2 3.5v2.1a6.5 6.5 0 0 1 0 12.8v2.1a8.5 8.5 0 0 0 0-17z"/></svg>';
+const SOUND_OFF =
+  '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 9v6h3.6L12 19V5L7.6 9H4z"/><path d="M21 9.4 19.6 8l-2.1 2.1L15.4 8 14 9.4l2.1 2.1L14 13.6 15.4 15l2.1-2.1 2.1 2.1 1.4-1.4-2.1-2.1z"/></svg>';
 
 // HUD DOM de la partida: distancia + velocidad (throttled) y overlay de pausa.
 // DOM puro = 0 draw calls; reutiliza los tokens CSS del lobby.
@@ -30,7 +35,7 @@ export class RunHUD {
         <div id="run-hud">
           <div class="hud-group">
             <button id="run-pause-btn" aria-label="Pausa">${PAUSE_ICON}</button>
-            <button id="run-mute" aria-label="Sonido">🔊</button>
+            <button id="run-mute" aria-label="Sonido">${SOUND_ON}</button>
             <div class="run-chip" id="run-hearts">❤❤❤</div>
           </div>
           <div class="run-chip" id="run-score"><b id="run-score-val">0</b><small>PUNTOS</small></div>
@@ -330,7 +335,7 @@ export class RunHUD {
 
   setMuted(muted) {
     if (this.el?.mute) {
-      this.el.mute.textContent = muted ? '🔇' : '🔊';
+      this.el.mute.innerHTML = muted ? SOUND_OFF : SOUND_ON;
       this.el.mute.classList.toggle('muted', !!muted);
     }
   }

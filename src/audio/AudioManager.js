@@ -78,32 +78,58 @@ export class AudioManager {
     if (this.engine) this.engine.osc.type = this.carSound.type;
   }
 
-  // --- MOTOR del jugador (loop; pitch/volumen por velocidad) ---
+  // --- MOTOR del jugador (loop). Volumen BAJO y suave (antes sonaba "a punto de
+  // estallar"): sub sine (no square), filtro muy cerrado al ralentí. El tono sube
+  // dentro de cada marcha y CAE al cambiar → cada 60 km/h se oye el cambio y el
+  // motor va "mejorando".
   startEngine() {
     this.ensure();
     if (!this.ctx || this.engine) return;
+    const t0 = this.ctx.currentTime;
     const g = this.ctx.createGain(); g.gain.value = 0; g.connect(this.buses.engine);
     const osc = this.ctx.createOscillator(); osc.type = this.carSound.type || 'sawtooth';
-    const sub = this.ctx.createOscillator(); sub.type = 'square';
-    const subG = this.ctx.createGain(); subG.gain.value = 0.35; sub.connect(subG); subG.connect(g);
-    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900;
+    const sub = this.ctx.createOscillator(); sub.type = 'sine'; // rumor grave sin buzz
+    const subG = this.ctx.createGain(); subG.gain.value = 0.16; sub.connect(subG); subG.connect(g);
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 300; lp.Q.value = 0.5;
     osc.connect(lp); lp.connect(g);
     osc.frequency.value = this.carSound.base; sub.frequency.value = this.carSound.base * 0.5;
     osc.start(); sub.start();
-    this.engine = { osc, sub, g, lp };
-    g.gain.linearRampToValueAtTime(0.5, this.ctx.currentTime + 0.4);
+    this.engine = { osc, sub, g, lp, gear: 0 };
+    // arranque suave y VOLUMEN BAJO (antes 0.5 → sonaba forzado/roto)
+    g.gain.linearRampToValueAtTime(0.14, t0 + 0.6);
   }
   setEngineSpeed(kmh = 0, throttle = 0) {
     if (!this.engine || !this.ctx) return;
     const base = this.carSound.base;
     const rev = this.carSound.rev || 1;
-    const k = Math.min(1, kmh / 150);
-    const f = base + k * base * 1.7 * rev;
+    const GEAR = 60;                        // km/h por marcha
+    const gear = Math.floor(kmh / GEAR);    // 0,1,2,...
+    const within = (kmh % GEAR) / GEAR;     // 0..1 progreso dentro de la marcha
+    // El tono sube con `within` (aceleración audible, el Hz) y cae al cambiar de
+    // marcha; el piso sube un poco por marcha (motor que va "mejorando").
+    const f = base * (1 + gear * 0.10) + within * base * 1.35 * rev;
     const t = this.ctx.currentTime;
-    this.engine.osc.frequency.setTargetAtTime(f, t, 0.08);
-    this.engine.sub.frequency.setTargetAtTime(f * 0.5, t, 0.08);
-    this.engine.lp.frequency.setTargetAtTime(700 + k * 1900, t, 0.1);
-    this.engine.g.gain.setTargetAtTime(0.4 + throttle * 0.2, t, 0.1);
+    this.engine.osc.frequency.setTargetAtTime(f, t, 0.07);
+    this.engine.sub.frequency.setTargetAtTime(f * 0.5, t, 0.07);
+    // Filtro: muy cerrado al ralentí (suave) y abre con las revoluciones (brillo)
+    this.engine.lp.frequency.setTargetAtTime(300 + within * 1350 + gear * 180, t, 0.09);
+    // Volumen moderado; sube un pelín al acelerar
+    this.engine.g.gain.setTargetAtTime(0.13 + throttle * 0.07, t, 0.12);
+    // Cambio de marcha (subida): blip corto de cambio
+    if (gear !== this.engine.gear) {
+      if (gear > this.engine.gear) this._shiftBlip();
+      this.engine.gear = gear;
+    }
+  }
+  _shiftBlip() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const g = this.ctx.createGain(); g.gain.value = 0; g.connect(this.buses.engine);
+    const osc = this.ctx.createOscillator(); osc.type = 'sine';
+    osc.frequency.setValueAtTime(this.carSound.base * 1.5, t);
+    osc.frequency.exponentialRampToValueAtTime(this.carSound.base * 0.85, t + 0.12);
+    g.gain.setValueAtTime(0.1, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+    osc.connect(g); osc.start(t); osc.stop(t + 0.17);
   }
   stopEngine() {
     if (!this.engine || !this.ctx) return;
@@ -132,18 +158,28 @@ export class AudioManager {
     return g;
   }
 
+  // Disparo REALISTA en 3 capas: CRACK agudo (ataque) + CUERPO (detonación) +
+  // THUMP grave (peso). Punchy y seco, no un "shhh" de ruido plano.
   gunshot(kind = 'standard', x = 0, z = 0) {
     this.ensure(); if (!this.ctx) return;
     const t = this.ctx.currentTime;
-    const out = this._out('sfx', x, z, 0.5);
-    const src = this.ctx.createBufferSource(); src.buffer = this.noiseBuffer;
-    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass';
-    bp.frequency.value = kind === 'heavy' ? 700 : kind === 'explosive' ? 480 : 1700; bp.Q.value = 0.9;
-    const env = this.ctx.createGain();
-    env.gain.setValueAtTime(0.9, t);
-    env.gain.exponentialRampToValueAtTime(0.001, t + (kind === 'heavy' ? 0.16 : 0.07));
-    src.connect(bp); bp.connect(env); env.connect(out);
-    src.start(t); src.stop(t + 0.2);
+    const heavy = kind === 'heavy';
+    const out = this._out('sfx', x, z, heavy ? 0.7 : 0.5);
+    // 1) CRACK: ruido high-passed, ataque instantáneo, decae muy rápido
+    const crack = this.ctx.createBufferSource(); crack.buffer = this.noiseBuffer;
+    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = heavy ? 1700 : 2600;
+    const cEnv = this.ctx.createGain(); cEnv.gain.setValueAtTime(0.95, t); cEnv.gain.exponentialRampToValueAtTime(0.001, t + 0.028);
+    crack.connect(hp); hp.connect(cEnv); cEnv.connect(out); crack.start(t); crack.stop(t + 0.05);
+    // 2) CUERPO: ruido low-passed, algo más de cola (la detonación)
+    const body = this.ctx.createBufferSource(); body.buffer = this.noiseBuffer;
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = heavy ? 900 : 1500;
+    const bEnv = this.ctx.createGain(); bEnv.gain.setValueAtTime(0.6, t); bEnv.gain.exponentialRampToValueAtTime(0.001, t + (heavy ? 0.16 : 0.09));
+    body.connect(lp); lp.connect(bEnv); bEnv.connect(out); body.start(t); body.stop(t + 0.22);
+    // 3) THUMP: seno grave que baja → peso del cañón
+    const osc = this.ctx.createOscillator(); osc.type = 'sine';
+    osc.frequency.setValueAtTime(heavy ? 155 : 230, t); osc.frequency.exponentialRampToValueAtTime(heavy ? 52 : 85, t + 0.1);
+    const oEnv = this.ctx.createGain(); oEnv.gain.setValueAtTime(heavy ? 0.6 : 0.4, t); oEnv.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    osc.connect(oEnv); oEnv.connect(out); osc.start(t); osc.stop(t + 0.14);
   }
 
   impact(x = 0, z = 0, strength = 1) {

@@ -155,8 +155,9 @@ progresiva. El mapeo id→archivo vive en `CAR_MODEL_FILES` (VehicleConfig).
 ## 🔊 Audio procedural — `src/audio/AudioManager.js`
 
 Todo el sonido es **sintetizado con Web Audio** (sin archivos → cero descargas, editable):
-- **Motor** por coche (loop; el tono sube con la velocidad = sonido de aceleración). Cada
-  coche trae su `sound` en `GARAGE_CARS` (base Hz, onda, rev).
+- **Motor** por coche (loop, volumen bajo y suave; sub sine para no "sonar roto"). El tono
+  sube dentro de cada marcha y CAE al cambiar → **cada 60 km/h** se oye el cambio y el motor
+  va "mejorando" (blip de cambio incluido). Cada coche trae su `sound` en `GARAGE_CARS`.
 - **Disparos** de torreta (por tipo de bala), **impactos**/choques, **explosiones**
   (misil/gordo), **gruñido** y **muerte** de zombis, **pickups**.
 - **Sirenas** variadas (ambulancia/bombero/policía) para el tráfico de emergencia: loop

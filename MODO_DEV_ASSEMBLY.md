@@ -374,17 +374,33 @@ aplicarlos (luces como PointLight/SpotLight, llantas como spinners, humo aliment
 
 ---
 
-## Editor EN PARTIDA: HUD + Cámara
+## Editor EN PARTIDA: HUD + Cámara + Sonidos
 
-Al abrir el Modo Dev queda activo `dh_dev='1'` (también sirve `?dev` en la URL). Entonces,
-**dentro de la partida** aparece un botón flotante **⚙** (arriba a la derecha) que abre el
-*Editor de partida* (`src/ui-hud/RunDevOverlay.js`):
+### ¿Cómo entro al editor en partida?
+El botón flotante **⚙** (arriba a la derecha, **dentro de la partida**) aparece si el modo
+dev está activo. Hay 3 formas de activarlo:
 
+1. **`?dev` en la URL** — abre el juego como `http://localhost:3000/?dev` (o añade `?dev`).
+2. **`localStorage.dh_dev = '1'`** — se activa **solo** al abrir el Assembly Editor una vez
+   (desde el lápiz de "Editar coche" en el garaje); queda guardado en ese navegador.
+3. **En `localhost`** siempre está activo (servidor de desarrollo) — así nunca "desaparece".
+
+En producción (build publicado) NO aparece salvo que uses `?dev`. Pulsa **⚙** para abrir el
+*Editor de partida* (`src/ui-hud/RunDevOverlay.js`).
+
+### Qué se puede editar
 - **Cámara** — sliders de Altura, Distancia, Mira alto, Mira lejos, FOV e **Inclinación**.
-  Se aplican en vivo (`ChaseCamera.reloadConfig()`) y se guardan en `localStorage.dh_run_camera`.
+  Se aplican en vivo (`ChaseCamera.reloadConfig()`).
 - **HUD** — con el editor abierto, los indicadores (puntos, distancia, corazones, combo,
-  oleada, velocidad) quedan marcados con borde punteado y se **arrastran** a la posición
-  deseada. **Guardar** persiste en `localStorage.dh_hud_layout`; `RunHUD.applyLayout()` los
-  reposiciona en cada partida (centro en % del viewport → responsive).
-- **Previews** — botones *Combo x5*, *Oleada* y *-1 vida* para ver cómo se ven los textos.
-- **Reset HUD** / **Reset cámara** vuelven a los valores por defecto de `gameplay.js`.
+  oleada, velocidad) quedan con borde punteado y se **arrastran** (pointer capture, fiable)
+  a la posición deseada. `RunHUD.applyLayout()` los reposiciona (centro en % → responsive).
+- **Sonidos** — volúmenes por bus (general/motor/disparos/sirenas/zombis), motor del coche
+  (Hz + onda) y botones de prueba (disparo/explosión/gruñido/sirena/mute).
+- **Previews** — *Combo x5*, *Oleada*, *-1 vida* para ver los textos.
+
+### Guardado GLOBAL (para todos los usuarios)
+**Guardar** escribe `assets/config/run-config.json` (cámara + HUD + sonidos) vía el
+dev-server (`/api/save-run-config`), y también guarda copia local en `localStorage`. El
+juego lo lee al arrancar (`RunConfig`), con precedencia **gameplay.js < archivo global <
+localStorage**. Commitea `run-config.json` para que el ajuste llegue a todos.
+**Reset HUD** / **Reset cámara** vuelven a los valores por defecto de `gameplay.js`.
