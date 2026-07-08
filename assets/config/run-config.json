@@ -15,14 +15,14 @@
   },
   "sounds": {
     "volumes": {
-      "master": 0.4,
+      "master": 0.05,
       "engine": 0.05,
       "sfx": 0.05,
       "siren": 0.05,
       "zombie": 0.05
     },
     "car": {
-      "base": 57,
+      "base": 40,
       "type": "sawtooth",
       "rev": 1
     },

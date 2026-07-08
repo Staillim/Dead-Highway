@@ -635,6 +635,10 @@ export class RunScene {
     const r = this._finalizeRun();
     if (!r) return;
     this.controller.paused = true; // congelar el mundo detrás de la pantalla
+    // El audio CAE en la pantalla de muerte: se apaga el motor y sirenas y baja el general
+    audio.stopEngine();
+    audio.stopAllSirens();
+    audio.duck(0.18);
     this.hud.showGameOver(r);
   }
 
@@ -642,6 +646,7 @@ export class RunScene {
   // falta y vuelve al lobby.
   quitToGarage() {
     this._finalizeRun();
+    audio.unduck(); // restaurar el general para el lobby / próxima carrera
     this.onExit?.();
   }
 
@@ -653,6 +658,9 @@ export class RunScene {
     this.hud.setHearts(this.hp, this.maxHp);
     this.hud.setShield(this.shield, this.shieldMax);
     this.hud.setCombo(0, 1, 0);
+    // Restaurar el audio y volver a arrancar el motor
+    audio.unduck();
+    audio.startEngine();
   }
 
   update(dt) {
