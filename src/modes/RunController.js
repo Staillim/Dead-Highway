@@ -14,7 +14,8 @@ export class RunController {
     this.paused = false;
     this.ended = false;
     this.slow = 1; // factor de ralentización por impacto (recupera solo)
-    this.fuel = GAMEPLAY.fuel.max;
+    this.fuelMax = this.fuelMax || GAMEPLAY.fuel.max; // techo del tanque (mejora de capacidad)
+    this.fuel = this.fuelMax;
     this.outOfFuel = false;
     this.throttle = 0;    // botón AVANZAR mantenido (0/1)
     this.extraSpeed = 0;  // velocidad extra ACUMULADA al avanzar; NO baja sola (ratchet)
@@ -32,7 +33,7 @@ export class RunController {
   }
 
   refuel(amount) {
-    this.fuel = Math.min(GAMEPLAY.fuel.max, this.fuel + amount);
+    this.fuel = Math.min(this.fuelMax || GAMEPLAY.fuel.max, this.fuel + amount);
   }
 
   update(dt) {
@@ -76,7 +77,7 @@ export class RunController {
       speed: this.speed,
       kmh: Math.round(this.speed * 3.6),
       fuel: this.fuel,
-      fuelPct: Math.round((this.fuel / GAMEPLAY.fuel.max) * 100),
+      fuelPct: Math.round((this.fuel / (this.fuelMax || GAMEPLAY.fuel.max)) * 100),
       best: Math.max(this.best, Math.round(this.distance))
     };
   }

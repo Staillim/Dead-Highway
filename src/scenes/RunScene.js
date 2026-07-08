@@ -32,6 +32,7 @@ import { NightMode } from '../vfx/NightMode.js';
 import { VehicleLights } from '../vfx/VehicleLights.js';
 import { SmokeSystem } from '../vfx/SmokeSystem.js';
 import { AbilitySystem } from '../abilities/AbilitySystem.js';
+import { computeFuelMax } from '../save/ShopFuelUpgrade.js';
 
 const DEBUG = new URLSearchParams(location.search).has('debug');
 
@@ -97,6 +98,14 @@ export class RunScene {
     this.laneSystem.changeMul = st.laneSpeedMul;
     // Nitro: techo del acelerador
     this.controller.boostMul = st.boostMul;
+    // Capacidad de combustible (mejora comprable)
+    this.controller.fuelMax = computeFuelMax(this.state);
+    this.controller.fuel = this.controller.fuelMax;
+    // Mitigación de choque: los accesorios (parachoques/blindaje/púas) dan una
+    // probabilidad de ABSORBER el golpe sin perder corazón (antes eran decorativos).
+    const eq = this.state.equipped || {};
+    this.crashMitigation = Math.min(0.6,
+      (eq.bumperAccessory ? 0.22 : 0) + (eq.doorArmor ? 0.22 : 0) + (eq.spikes ? 0.12 : 0));
     // Escudo: cargas que absorben choques y se recargan solas
     this.shieldMax = st.shieldCharges;
     this.shieldRegenS = st.shieldRegenS;
@@ -379,6 +388,13 @@ export class RunScene {
       this.speedFx.addImpact(0.8);
       this.controller.applyImpactSlow();
       return; // sin daño: el escudo aguantó
+    }
+    // Blindaje/parachoques: probabilidad de absorber el golpe
+    if (this.crashMitigation && Math.random() < this.crashMitigation) {
+      this.chaseCamera.addImpulse(0.7);
+      this.speedFx.addImpact(0.6);
+      this.controller.applyImpactSlow();
+      return;
     }
     this.hp -= 1;
     this.hud.setHearts(this.hp, this.maxHp);
