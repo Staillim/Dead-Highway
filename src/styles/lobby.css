@@ -48,6 +48,10 @@ body {
   background: #0b0c10;
   color: var(--txt);
   font-family: Bahnschrift, 'Segoe UI', system-ui, sans-serif;
+  /* Letras más nítidas ("4K"): antialias suave + kerning/ligaduras */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 button {

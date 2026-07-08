@@ -9,6 +9,7 @@ import { LobbyScene } from './scenes/LobbyScene.js';
 import { LobbyUI } from './ui/LobbyUI.js';
 import { buildEquipped } from './vehicles/EquippedLoader.js';
 import { GAMEPLAY } from './config/gameplay.js';
+import { loadRunConfig } from './config/RunConfig.js';
 
 const DEBUG = new URLSearchParams(location.search).has('debug');
 
@@ -21,6 +22,8 @@ function createDebugPanel() {
 
 async function init() {
   const state = PlayerState.load();
+  // Config global de la partida (cámara/HUD editada en dev) — no bloquea si falla
+  loadRunConfig();
   const discovered = await AccessoryDiscovery.discover();
 
   if (DEBUG) createDebugPanel();

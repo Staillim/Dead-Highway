@@ -73,15 +73,43 @@ export class ZombieRig {
     this._set('Waist', hunch * 0.2, s * 0.05, 0);
     this._set('Head', -hunch * 0.3, s * 0.08, 0);
 
-    // Brazos EXTENDIDOS hacia adelante (pose clásica de zombi) + balanceo
-    const reach = 1.2 - intensity * 0.3;
-    this._set('L_Clavicle', 0, 0, -0.2);
-    this._set('R_Clavicle', 0, 0, 0.2);
-    this._set('L_Upperarm', -reach + c * 0.2, 0, 0.15);
-    this._set('R_Upperarm', -reach - c * 0.2, 0, -0.15);
-    this._set('L_Forearm', -0.5, 0, 0);
-    this._set('R_Forearm', -0.5, 0, 0);
+    // Brazos EXTENDIDOS hacia adelante (pose clásica de zombi) + leve balanceo.
+    // z-twist mínimo (antes 0.15 deformaba el hombro) y codo suave (antes -0.5
+    // hiperextendía el antebrazo → se veía "al revés").
+    const reach = 1.05 - intensity * 0.25;
+    this._set('L_Clavicle', 0, 0, -0.08);
+    this._set('R_Clavicle', 0, 0, 0.08);
+    this._set('L_Upperarm', -reach + c * 0.15, 0, 0.05);
+    this._set('R_Upperarm', -reach - c * 0.15, 0, -0.05);
+    this._set('L_Forearm', -0.28, 0, 0);
+    this._set('R_Forearm', -0.28, 0, 0);
 
+    this.applyPosture();
+  }
+
+  // Arrastre PROCEDURAL: el clip FBX "crawl" no sirve (el retarget es solo
+  // rotaciones → pierde el descenso del root y el zombi "gatea en el aire"). Acá
+  // el holder ya viene inclinado hacia el suelo (ZombieSystem) y esto anima el
+  // tirón de brazos + arrastre de piernas, con la cabeza mirando al frente.
+  crawl(phase, intensity = 0.8) {
+    const s = Math.sin(phase);
+    // Torso estirado hacia adelante (pegado al suelo por la inclinación del holder)
+    this._set('Spine01', 0.15, 0, s * 0.05);
+    this._set('Spine02', 0.12, 0, -s * 0.04);
+    this._set('Waist', 0.08, s * 0.05, 0);
+    this._set('Head', 0.55, s * 0.08, 0); // levanta la cabeza para "mirar" al coche
+    // Brazos tirando alternados hacia adelante
+    this._set('L_Clavicle', 0, 0, -0.1);
+    this._set('R_Clavicle', 0, 0, 0.1);
+    this._set('L_Upperarm', -1.85 + s * (0.4 + intensity * 0.3), 0, 0.08);
+    this._set('R_Upperarm', -1.85 - s * (0.4 + intensity * 0.3), 0, -0.08);
+    this._set('L_Forearm', -0.25 - Math.max(0, s) * 0.4, 0, 0);
+    this._set('R_Forearm', -0.25 - Math.max(0, -s) * 0.4, 0, 0);
+    // Piernas arrastrando (poco movimiento, abiertas)
+    this._set('L_Thigh', 0.15 + s * 0.18, 0, 0.12);
+    this._set('R_Thigh', 0.15 - s * 0.18, 0, -0.12);
+    this._set('L_Calf', 0.35, 0, 0);
+    this._set('R_Calf', 0.35, 0, 0);
     this.applyPosture();
   }
 

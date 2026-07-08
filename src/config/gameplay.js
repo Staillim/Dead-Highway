@@ -89,8 +89,10 @@ export const GAMEPLAY = {
     pos: [0, 6.5, 10.5],
     lookAt: [0, 1.55, -12],// mira algo más arriba/cerca → se ve MENOS lo que viene (más tensión)
     tilt: 0,               // inclinación extra hacia abajo (grados); editable en modo dev
-    followX: 0.3,          // fracción del carril que sigue la cámara
+    followX: 0.3,          // fracción del carril que sigue la cámara en el CENTRO
+    followXEdge: 0.8,      // fracción en los carriles EXTREMOS (1 y 4): la cámara se corre
     lookFollowX: 0.12,
+    lookFollowXEdge: 0.32, // el punto de mira también se corre en los extremos
     shakeMax: 0.022
   },
 
@@ -112,7 +114,8 @@ export const GAMEPLAY = {
   // Fase 3-5: zombis (GDD §9). El mundo los trae a velocidad `speed`; su
   // locomoción propia (ownVel) suma/resta, y homingX los lleva al carril del carro.
   zombies: {
-    poolPerType: 9,        // instancias por tipo en el pool (~27 total)
+    poolPerType: 9,        // instancias por tipo en el pool
+    poolNormal: 16,        // el tipo NORMAL tiene más instancias (oleadas densas de normales)
     spawnZ: -120,          // dónde nacen (adelante)
     despawnZ: 30,          // detrás del carro → reciclar
     height: 1.95,          // altura objetivo (más grandes, imponentes)
@@ -124,8 +127,10 @@ export const GAMEPLAY = {
     waveDurS: [7, 15],     // duración de la oleada [inicio, tope por dificultad]
     calmDurS: [3, 6],      // duración de la calma [tope por dificultad, inicio]
     waveSpawnS: [0.9, 2.0],// intervalo entre ráfagas DENTRO de una oleada
-    burstBase: 3,          // zombis por ráfaga (base)
-    burstMax: 6,           // extra por dificultad
+    burstBase: 4,          // zombis por ráfaga (base)
+    burstMax: 11,          // extra por dificultad (oleadas mucho más densas al avanzar)
+    normalBiasBase: 0.45,  // fracción de la ráfaga que es zombi NORMAL (sube con la distancia)
+    normalBiasMax: 0.35,   // +extra de sesgo a normal al máximo de dificultad (→ ~80%)
     speedRamp: 0.45,       // +45% de velocidad propia al máximo de dificultad
     diffDistance: 6000,    // metros para llegar a dificultad máxima
     waveMinS: 1.5,         // (legacy)
@@ -210,7 +215,7 @@ export const GAMEPLAY = {
     windowS: 2.2,          // ventana para encadenar la próxima kill
     perKill: 12,           // puntos base por kill (× multiplicador)
     killsPerTier: 4,       // cada N kills sube el multiplicador (x1, x2, x3…)
-    maxMult: 8,
+    maxMult: 999,          // SIN límite práctico: el multiplicador crece mientras encadenes
     coinsPerScore: 0.04    // monedas extra = score × esto (al terminar)
   },
 

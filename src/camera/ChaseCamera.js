@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GAMEPLAY } from '../config/gameplay.js';
+import { getRunCameraConfig } from '../config/RunConfig.js';
 
 // Override de cámara editable en el MODO DEV (persistido en localStorage). El
 // editor de HUD/cámara escribe estos campos; la partida los aplica al construir
@@ -18,14 +19,17 @@ export function readCameraOverride() {
 // Config efectiva = gameplay.camera + override del dev (posY/posZ/lookY/lookZ/fov/tilt)
 function buildCamConfig() {
   const cfg = GAMEPLAY.camera;
-  const o = readCameraOverride() || {};
+  // Precedencia: gameplay < archivo global (run-config) < localStorage (edición local)
+  const o = { ...(getRunCameraConfig() || {}), ...(readCameraOverride() || {}) };
   return {
     pos: [cfg.pos[0], o.posY ?? cfg.pos[1], o.posZ ?? cfg.pos[2]],
     lookAt: [cfg.lookAt[0], o.lookY ?? cfg.lookAt[1], o.lookZ ?? cfg.lookAt[2]],
     fov: o.fov ?? cfg.fov,
     fovBoost: cfg.fovBoost,
-    followX: cfg.followX,
+    followX: o.followX ?? cfg.followX,
+    followXEdge: o.followXEdge ?? cfg.followXEdge ?? cfg.followX,
     lookFollowX: cfg.lookFollowX,
+    lookFollowXEdge: cfg.lookFollowXEdge ?? cfg.lookFollowX,
     shakeMax: cfg.shakeMax,
     tilt: o.tilt ?? cfg.tilt ?? 0   // grados de inclinación extra hacia abajo
   };
@@ -73,9 +77,19 @@ export class ChaseCamera {
     this.time += dt;
     const cam = this.cam;
     const k = speed / GAMEPLAY.speed.max;
+    const lx = laneSystem.x;
+
+    // Seguimiento NO LINEAL: casi nada en los 2 carriles del centro, pero al pasar a
+    // los carriles EXTREMOS (1 y 4) la cámara se corre hacia ese lado para que el
+    // coche no se salga del cuadro (crítico en pantallas angostas → escala backScale).
+    const maxX = ((GAMEPLAY.lanes.count - 1) / 2) * GAMEPLAY.lanes.width || 1;
+    const edge = Math.min(1, Math.abs(lx) / maxX);
+    const edge2 = edge * edge; // rampa: ~0 en el centro, 1 en los extremos
+    const followFrac = Math.min(0.95, cam.followX + (cam.followXEdge - cam.followX) * edge2 * this.backScale);
+    const lookFrac = Math.min(0.6, cam.lookFollowX + (cam.lookFollowXEdge - cam.lookFollowX) * edge2 * this.backScale);
 
     // Seguimiento parcial del carril, con suavizado propio de la cámara
-    this.followX += (laneSystem.x * cam.followX - this.followX) * Math.min(1, dt * 6);
+    this.followX += (lx * followFrac - this.followX) * Math.min(1, dt * 6);
 
     // Vibración: ruido suave siempre presente + impulso amortiguado
     this.impulse = Math.max(0, this.impulse - dt * 3.2);
@@ -92,7 +106,7 @@ export class ChaseCamera {
     // proporcional a la distancia horizontal → la cámara "pica" y se ve menos lejos.
     const tiltDrop = cam.tilt ? Math.tan(THREE.MathUtils.degToRad(cam.tilt)) * (camZ - cam.lookAt[2]) : 0;
     this.camera.lookAt(
-      cam.lookAt[0] + laneSystem.x * cam.lookFollowX + nx * 0.5,
+      cam.lookAt[0] + lx * lookFrac + nx * 0.5,
       cam.lookAt[1] - tiltDrop + ny * 0.5,
       cam.lookAt[2]
     );

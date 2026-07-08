@@ -84,6 +84,31 @@ export function accessoryListPlugin() {
         }
       });
 
+      // Config GLOBAL de la partida (cámara + layout del HUD) editada en el modo dev.
+      // Se escribe a assets/config/run-config.json → lo lee el juego para TODOS los
+      // usuarios (no solo el navegador que editó). Igual patrón que save-socket.
+      server.middlewares.use('/api/save-run-config', async (req, res, next) => {
+        if (req.method !== 'POST') {
+          res.statusCode = 405;
+          res.end('Method Not Allowed');
+          return;
+        }
+        try {
+          const body = await readBody(req);
+          const data = JSON.parse(body);
+          const root = process.cwd();
+          const dir = path.join(root, 'assets', 'config');
+          if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+          fs.writeFileSync(path.join(dir, 'run-config.json'), JSON.stringify(data, null, 2));
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ ok: true }));
+        } catch (err) {
+          console.error('[dev-api] Error guardando run-config:', err);
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: err.message }));
+        }
+      });
+
       server.middlewares.use('/api/save-zombie-config', async (req, res, next) => {
         if (req.method !== 'POST') {
           res.statusCode = 405;

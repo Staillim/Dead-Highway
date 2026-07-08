@@ -14,10 +14,14 @@ const DRAGGABLE = ['run-score', 'run-distance', 'run-hearts', 'run-speed', 'run-
 
 export function devEnabled() {
   try {
-    return localStorage.getItem('dh_dev') === '1' ||
-      (typeof location !== 'undefined' && /[?&]dev\b/.test(location.search));
+    // En localhost (servidor de desarrollo) siempre disponible → nunca "desaparece".
+    const host = typeof location !== 'undefined' ? location.hostname : '';
+    const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '' || host.endsWith('.local');
+    if (isLocal) return true;
+    if (localStorage.getItem('dh_dev') === '1') return true;
+    return typeof location !== 'undefined' && /[?&]dev\b/.test(location.search);
   } catch (e) {
-    return /[?&]dev\b/.test(location.search || '');
+    return /[?&]dev\b/.test((typeof location !== 'undefined' && location.search) || '');
   }
 }
 
@@ -143,9 +147,15 @@ export class RunDevOverlay {
       el.hidden = false;
       el.classList.add('dev-draggable');
       el.style.pointerEvents = 'auto';
+      el.style.touchAction = 'none';
       const down = (e) => this._startDrag(e, el, id);
       el.addEventListener('pointerdown', down);
-      this._dragCleanup.push(() => { el.removeEventListener('pointerdown', down); el.classList.remove('dev-draggable'); });
+      this._dragCleanup.push(() => {
+        el.removeEventListener('pointerdown', down);
+        el.classList.remove('dev-draggable');
+        el.style.pointerEvents = '';
+        el.style.touchAction = '';
+      });
     }
   }
 
@@ -154,9 +164,14 @@ export class RunDevOverlay {
     this._dragCleanup = [];
   }
 
+  // Arrastre FIABLE con pointer capture: los pointermove/up se capturan en el
+  // propio elemento aunque el puntero salga de él o haya otra capa encima
+  // (#run-touch). Antes se perdía el arrastre en cuanto te movías rápido.
   _startDrag(e, el, id) {
     e.preventDefault();
     e.stopPropagation();
+    try { el.setPointerCapture(e.pointerId); } catch (_) {}
+    el.classList.add('dev-dragging');
     const startX = e.clientX, startY = e.clientY;
     const rect = el.getBoundingClientRect();
     const cx0 = rect.left + rect.width / 2;
@@ -171,12 +186,16 @@ export class RunDevOverlay {
       this.hud.applyLayout(this.working);
     };
     const up = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-      this._setStatus('Posición cambiada (sin guardar).');
+      el.removeEventListener('pointermove', move);
+      el.removeEventListener('pointerup', up);
+      el.removeEventListener('pointercancel', up);
+      el.classList.remove('dev-dragging');
+      try { el.releasePointerCapture(e.pointerId); } catch (_) {}
+      this._setStatus('Posición cambiada (Guarda para conservar).');
     };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
   }
 
   _applyCam() {
@@ -188,10 +207,31 @@ export class RunDevOverlay {
     this.chaseCamera?.reloadConfig?.();
   }
 
-  _save() {
-    try { localStorage.setItem(HUD_KEY, JSON.stringify(this.working)); } catch (e) {}
-    this._applyCam(); // ya está guardada, pero nos aseguramos
-    this._setStatus('✓ Guardado (HUD + cámara).');
+  async _save() {
+    // Recolectar cámara (sliders) + layout HUD
+    const camera = {};
+    this.panel.querySelectorAll('input[data-cam]').forEach((inp) => { camera[inp.dataset.cam] = +inp.value; });
+    const hud = this.working;
+    // Local (para este navegador, aplicación inmediata)
+    try {
+      localStorage.setItem(HUD_KEY, JSON.stringify(hud));
+      localStorage.setItem(CAMERA_OVERRIDE_KEY, JSON.stringify(camera));
+    } catch (e) {}
+    this.chaseCamera?.reloadConfig?.();
+    // GLOBAL: escribir el archivo run-config.json vía dev-server → aplica a TODOS
+    let global = false;
+    try {
+      const res = await fetch('/api/save-run-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ camera, hud })
+      });
+      const r = await res.json();
+      global = !!r.ok;
+    } catch (e) { global = false; }
+    this._setStatus(global
+      ? '✓ Guardado GLOBAL (cámara + HUD, para todos).'
+      : '✓ Guardado local (servidor no disponible; commitea run-config.json).');
   }
 
   _resetHud() {

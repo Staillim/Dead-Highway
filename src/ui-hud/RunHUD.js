@@ -1,4 +1,5 @@
 import { GAMEPLAY } from '../config/gameplay.js';
+import { getRunHudLayout } from '../config/RunConfig.js';
 
 const fmt = (n) => Math.round(n).toLocaleString('en-US');
 // A partir del kilómetro se lee mejor en km ("4.24 km" en vez de "4,241 m")
@@ -155,7 +156,10 @@ export class RunHUD {
   // Las posiciones se guardan como centro en % del viewport → responsive.
   applyLayout(layout) {
     if (layout === undefined) {
-      try { layout = JSON.parse(localStorage.getItem('dh_hud_layout') || 'null'); } catch (e) { layout = null; }
+      // Local (localStorage) primero; si no, el layout GLOBAL del archivo run-config
+      let ls = null;
+      try { ls = JSON.parse(localStorage.getItem('dh_hud_layout') || 'null'); } catch (e) { ls = null; }
+      layout = ls || getRunHudLayout() || null;
     }
     const ids = ['run-score', 'run-distance', 'run-hearts', 'run-speed', 'run-combo', 'run-wave'];
     for (const id of ids) {

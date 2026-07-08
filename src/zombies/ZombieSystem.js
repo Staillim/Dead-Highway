@@ -80,7 +80,8 @@ export class ZombieSystem {
       const scale = (GAMEPLAY.zombies.height / realH) * (zcfg.scale ?? cfg.scale);
       const footOffset = boneMin * scale; // para plantar los pies en y=0
 
-      for (let i = 0; i < GAMEPLAY.zombies.poolPerType; i++) {
+      const poolCount = type === 'normal' ? (GAMEPLAY.zombies.poolNormal || GAMEPLAY.zombies.poolPerType) : GAMEPLAY.zombies.poolPerType;
+      for (let i = 0; i < poolCount; i++) {
         const model = skeletonClone(template);
         model.scale.setScalar(scale);
         model.position.y = -footOffset;
@@ -151,8 +152,12 @@ export class ZombieSystem {
   }
 
   spawn(distance, laneSystem, idx = 0, burst = 1) {
+    const zc = GAMEPLAY.zombies;
     const types = this.allowedTypes(distance);
-    const type = types[Math.floor(Math.random() * types.length)];
+    // Sesgo a NORMAL que sube con la distancia → oleadas cada vez más densas de
+    // zombis normales (más difícil al avanzar). El resto de tipos sigue saliendo.
+    const normalBias = Math.min(0.85, (zc.normalBiasBase ?? 0.45) + (this.diff || 0) * (zc.normalBiasMax ?? 0.35));
+    const type = Math.random() < normalBias ? 'normal' : types[Math.floor(Math.random() * types.length)];
     const z = pick(this.pool, type);
     if (!z) return;
 
@@ -192,8 +197,9 @@ export class ZombieSystem {
     z.engaged = false;
     z.wanderAngle = Math.random() * Math.PI * 2;
     z.wanderTurnT = 0.5 + Math.random() * 2;
-    if (z.crawler) this.playAnim(z, 'crawl');
-    else this.playAnim(z, 'procedural');
+    // Los crawlers también van por procedural (el clip FBX 'crawl' flota por el
+    // retarget solo-rotaciones). El pitch al suelo + rig.crawl los planta.
+    this.playAnim(z, 'procedural');
 
     this.active.push(z);
   }
@@ -301,12 +307,19 @@ export class ZombieSystem {
         z.holder.rotation.y = Math.atan2(dx, Math.max(2, z.z * -1)) * 0.6;
       }
 
-      // Animación procedural de caminar SOLO si no hay clip FBX gobernando
+      // Animación procedural SOLO si no hay clip FBX gobernando
       if (z.animMode === 'procedural') {
-        const walkIntensity = z.walkCfg?.intensity ?? (z.engaged ? (z.type === 'runner' ? 1 : 0.5) : 0.3);
-        const walkHunch = z.walkCfg?.hunch ?? (z.type === 'fat' ? 0.35 : 0.6);
-        z.phase += dt * (z.engaged ? (4 + z.cfg.run * 6) : 3);
-        z.rig.walk(z.phase, walkIntensity, walkHunch);
+        if (z.crawler) {
+          // Arrastre: el holder se inclina hacia el suelo (no flota) + tirón de brazos
+          z.phase += dt * (z.engaged ? 5 : 3.2);
+          z.holder.rotation.x = -1.3;
+          z.rig.crawl(z.phase, z.engaged ? 1 : 0.6);
+        } else {
+          const walkIntensity = z.walkCfg?.intensity ?? (z.engaged ? (z.type === 'runner' ? 1 : 0.5) : 0.3);
+          const walkHunch = z.walkCfg?.hunch ?? (z.type === 'fat' ? 0.35 : 0.6);
+          z.phase += dt * (z.engaged ? (4 + z.cfg.run * 6) : 3);
+          z.rig.walk(z.phase, walkIntensity, walkHunch);
+        }
       }
 
       // Gordo: explota por PROXIMIDAD (no requiere contacto — el arador no protege)
