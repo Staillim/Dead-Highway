@@ -95,11 +95,50 @@
   text-shadow: 0 0 8px rgba(255, 70, 60, 0.45);
 }
 
-/* Escudo: abajo-izquierda (fuera de la barra superior, para no recargarla) */
+/* Habilidades activas: misil + EMP, abajo-izquierda con overlay de cooldown */
+#run-abilities {
+  position: absolute;
+  left: calc(env(safe-area-inset-left, 0px) + 14px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 26px);
+  z-index: 12;
+  display: flex;
+  gap: 10px;
+}
+.ability-btn {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: radial-gradient(circle at 50% 34%, rgba(64, 74, 96, 0.92), rgba(18, 22, 32, 0.92));
+  color: #cfe0ff;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 0;
+  pointer-events: auto;
+  touch-action: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  transition: transform 0.08s ease, box-shadow 0.12s;
+}
+.ability-btn svg { width: 26px; height: 26px; position: relative; z-index: 2; }
+.ability-btn:active { transform: scale(0.92); }
+.ability-btn.ready { border-color: rgba(120, 200, 255, 0.7); box-shadow: 0 0 14px rgba(90, 170, 255, 0.45); }
+#ab-emp.ready { border-color: rgba(255, 220, 120, 0.75); box-shadow: 0 0 14px rgba(245, 200, 80, 0.45); color: #ffe08a; }
+.ab-cd {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 0%;
+  background: rgba(8, 10, 16, 0.74);
+  z-index: 1;
+  transition: height 0.1s linear;
+}
+
+/* Escudo: abajo-izquierda, ARRIBA de los botones de habilidad */
 #run-shield {
   position: absolute;
   left: calc(env(safe-area-inset-left, 0px) + 14px);
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 30px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 92px);
   z-index: 11;
   display: flex;
   align-items: center;

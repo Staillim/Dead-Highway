@@ -31,6 +31,7 @@ import { RunPickups } from '../collectibles/RunPickups.js';
 import { NightMode } from '../vfx/NightMode.js';
 import { VehicleLights } from '../vfx/VehicleLights.js';
 import { SmokeSystem } from '../vfx/SmokeSystem.js';
+import { AbilitySystem } from '../abilities/AbilitySystem.js';
 
 const DEBUG = new URLSearchParams(location.search).has('debug');
 
@@ -214,6 +215,12 @@ export class RunScene {
       onExplode: (x, z) => { this.explosions.boom(x, z); this.chaseCamera.addImpulse(0.5); this.speedFx.addImpact(0.4); }
     });
     this.hoodWeapon = new HoodWeaponSystem(this.scene, this.vehicle, this.zombies);
+    // Habilidades activas: misil (limpia zona) + EMP (aturde/frena tráfico)
+    this.abilities = new AbilitySystem({
+      zombies: this.zombies, traffic: this.traffic, explosions: this.explosions,
+      onMissile: (x, z) => { this.explosions.boom(x, z); this.chaseCamera.addImpulse(1.8); this.speedFx.addImpact(1.4); },
+      onEmp: () => { this.chaseCamera.addImpulse(1.2); this.speedFx.addImpact(1.0); }
+    });
     this.latched = [];
     this.shakeMeter = 0;
 
@@ -240,7 +247,8 @@ export class RunScene {
       onPause: () => this.setPaused(true),
       onResume: () => this.setPaused(false),
       onExit: () => this.endRun(),
-      onThrottle: (v) => { if (!this.controller.paused) this.controller.setThrottle(v); }
+      onThrottle: (v) => { if (!this.controller.paused) this.controller.setThrottle(v); },
+      onAbility: (kind) => { if (!this.controller.paused) this.abilities.trigger(kind); }
     });
 
     // Auto-pausa al ocultar la pestaña/app
@@ -295,6 +303,8 @@ export class RunScene {
     this.nightMode.reset();
     this.smoke.reset();
     this.vehicleLights.setNight(0);
+    this.abilities.reset();
+    this.abilities.setRefs({ zombies: this.zombies, traffic: this.traffic, explosions: this.explosions });
     this.runBonusCoins = 0; this.runBonusGems = 0;
     // Soltar zombis agarrados del carro antes de reciclar
     for (const z of this.latched) this.vehicle.object3D.remove(z.holder);
@@ -557,6 +567,9 @@ export class RunScene {
       // Obstáculos (bus) + tráfico en contravía: avanzar y detectar choques
       const hit = this.obstacles.update(speed * dt, this.laneSystem);
       if (hit) this.onCrash();
+      this.abilities.update(dt);
+      this.traffic.empMul = this.abilities.getTrafficMul(); // EMP frena el tráfico
+      this.hud.setAbilityCooldowns(this.abilities.getCooldowns());
       const tc = this.traffic.update(dt, speed, this.laneSystem);
       if (tc) this.onCrash();
       this.pickups.update(dt, speed, this.laneSystem, this.controller.snapshot().fuelPct);

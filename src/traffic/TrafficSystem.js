@@ -122,8 +122,9 @@ export class TrafficSystem {
   update(dt, speed, laneSystem) {
     const cfg = GAMEPLAY.traffic;
     let crash = null;
-    // Contravía: vienen hacia el jugador (mundo) + su propia velocidad
-    const dz = (speed + cfg.oncomingSpeed) * dt;
+    // Contravía: vienen hacia el jugador (mundo) + su propia velocidad.
+    // El EMP (this.empMul < 1) los frena un momento.
+    const dz = (speed + cfg.oncomingSpeed) * dt * (this.empMul ?? 1);
 
     for (const v of this.pool) {
       if (!v.active) continue;

@@ -10,12 +10,13 @@ const PAUSE_ICON =
 // HUD DOM de la partida: distancia + velocidad (throttled) y overlay de pausa.
 // DOM puro = 0 draw calls; reutiliza los tokens CSS del lobby.
 export class RunHUD {
-  constructor({ root, onPause, onResume, onExit, onThrottle }) {
+  constructor({ root, onPause, onResume, onExit, onThrottle, onAbility }) {
     this.root = root;
     this.onPause = onPause;
     this.onResume = onResume;
     this.onExit = onExit;
     this.onThrottle = onThrottle;
+    this.onAbility = onAbility;
     this.acc = 0;
     this.mountedOnce = false;
   }
@@ -37,6 +38,16 @@ export class RunHUD {
           <div class="fuel-track"><div id="run-fuel-fill"></div></div>
         </div>
         <div id="run-shield" hidden>🛡<b id="run-shield-n">0</b></div>
+        <div id="run-abilities">
+          <button class="ability-btn" id="ab-missile" aria-label="Misil">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2c3 1.5 4.5 4.5 4.5 8 0 2-.6 3.8-1.6 5.3l-1.9-1.4V22h-4v-8.1l-1.9 1.4C7.1 13.8 6.5 12 6.5 10 6.5 6.5 8 3.5 11 2h2zm-1 5.4a1.6 1.6 0 100 3.2 1.6 1.6 0 000-3.2z"/></svg>
+            <span class="ab-cd" id="ab-missile-cd"></span>
+          </button>
+          <button class="ability-btn" id="ab-emp" aria-label="EMP">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>
+            <span class="ab-cd" id="ab-emp-cd"></span>
+          </button>
+        </div>
         <button id="run-gas" aria-label="Avanzar">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.5l8.5 9.5H15.2V20.5H8.8V13H3.5z"/></svg>
         </button>
@@ -67,6 +78,10 @@ export class RunHUD {
         comboMult: this.root.querySelector('#run-combo-mult'),
         wave: this.root.querySelector('#run-wave'),
         waveN: this.root.querySelector('#run-wave-n'),
+        abMissile: this.root.querySelector('#ab-missile'),
+        abEmp: this.root.querySelector('#ab-emp'),
+        abMissileCd: this.root.querySelector('#ab-missile-cd'),
+        abEmpCd: this.root.querySelector('#ab-emp-cd'),
         dist: this.root.querySelector('#run-distance-val'),
         speed: this.root.querySelector('#run-speed'),
         fuel: this.root.querySelector('#run-fuel'),
@@ -93,6 +108,10 @@ export class RunHUD {
           if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') { this._fwdKey = false; setThrottle(0); }
         });
       }
+
+      // Botones de habilidad (misil / EMP)
+      this.el.abMissile?.addEventListener('pointerdown', (e) => { e.preventDefault(); this.onAbility?.('missile'); });
+      this.el.abEmp?.addEventListener('pointerdown', (e) => { e.preventDefault(); this.onAbility?.('emp'); });
 
       this.mountedOnce = true;
     }
@@ -154,6 +173,20 @@ export class RunHUD {
     } else if (combo === 0) {
       this.el.combo.hidden = true;
     }
+  }
+
+  // Cooldowns de habilidades: overlay de recarga (llena de abajo hacia arriba)
+  setAbilityCooldowns(cd) {
+    if (!this.el || !cd) return;
+    this._abCd(this.el.abMissile, this.el.abMissileCd, cd.missile);
+    this._abCd(this.el.abEmp, this.el.abEmpCd, cd.emp);
+  }
+  _abCd(btn, overlay, s) {
+    if (!btn || !overlay || !s) return;
+    const frac = s.max > 0 ? s.t / s.max : 0;
+    overlay.style.height = `${Math.round(frac * 100)}%`;
+    btn.classList.toggle('ready', s.ready);
+    btn.disabled = !s.ready;
   }
 
   // Escudo (mejora): muestra las cargas disponibles; se oculta si no hay escudo
