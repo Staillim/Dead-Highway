@@ -109,7 +109,8 @@ export class RunScene {
     this.turret.setStats({
       damage: Math.round(st.turretDamage * carPower * tStats.damageMul),
       fireRate: GAMEPLAY.turret.fireRate * st.turretFireRateMul * tStats.fireRateMul,
-      range: GAMEPLAY.turret.range * tStats.rangeMul * tUpBonus
+      range: GAMEPLAY.turret.range * tStats.rangeMul * tUpBonus,
+      shotKind: tStats.shot
     });
     // Munición desbloqueada por el nivel de la torreta (override dev: ?ammo=explosive)
     const ammoOverride = new URLSearchParams(location.search).get('ammo');
@@ -254,9 +255,11 @@ export class RunScene {
     await this.zombies.load();
     this.turret = new TurretSystem(this.scene, this.vehicle, this.zombies, {
       onExplode: (x, z) => { this.explosions.boom(x, z); this.chaseCamera.addImpulse(0.5); this.speedFx.addImpact(0.4); },
-      onFire: (kind) => audio.gunshot(kind)
+      onFire: (kind, rate) => audio.gunshot(kind, 0, 0, rate)
     });
-    this.hoodWeapon = new HoodWeaponSystem(this.scene, this.vehicle, this.zombies);
+    this.hoodWeapon = new HoodWeaponSystem(this.scene, this.vehicle, this.zombies, {
+      onFire: () => audio.gunshot('pistol', 0, 0, GAMEPLAY.hoodWeapon.fireRate)
+    });
     // Habilidades activas: misil (limpia zona) + EMP (aturde/frena tráfico)
     this.abilities = new AbilitySystem({
       zombies: this.zombies, traffic: this.traffic, explosions: this.explosions,
@@ -709,6 +712,9 @@ export class RunScene {
 
       // Zombis + combate (el mundo los trae; la torreta los mata; los gibs vuelan)
       this.zombies.update(dt, speed * dt, speed, this.laneSystem, this.controller.distance);
+      // La cadencia de la torreta escala con la dificultad (temprano dispara menos,
+      // igual que salen menos zombis; más adelante dispara más rápido).
+      this.turret.rateScale = 0.6 + 0.4 * (this.zombies.diff || 0);
       this.turret.update(dt);
       this.hoodWeapon.update(dt);
       this.gibs.update(dt, speed * dt);

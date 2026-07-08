@@ -49,6 +49,8 @@ export class TurretSystem {
     this.dmg = cfg.damage;      // sobreescribible por mejoras
     this.rate = cfg.fireRate;
     this.range = cfg.range;     // alcance (Z) — depende de la torreta + mejoras
+    this.shotKind = 'standard'; // estilo de sonido de disparo (por torreta)
+    this.rateScale = 1;         // escala de cadencia por dificultad (temprano dispara menos)
     // Tipo de bala activo (lo fija applyUpgrades según el nivel de la torreta)
     this.bulletKey = 'standard';
     this.bulletCfg = cfg.bulletTypes.standard;
@@ -114,10 +116,11 @@ export class TurretSystem {
     });
   }
 
-  setStats({ damage, fireRate, range } = {}) {
+  setStats({ damage, fireRate, range, shotKind } = {}) {
     if (damage != null) this.dmg = damage;
     if (fireRate != null) this.rate = fireRate;
     if (range != null) this.range = range;
+    if (shotKind != null) this.shotKind = shotKind;
   }
 
   // Cambia el tipo de bala (standard/rapid/piercing/heavy/explosive). Tiñe la
@@ -239,8 +242,8 @@ export class TurretSystem {
     this.flash.scale.setScalar((1.7 + Math.random() * 0.5) * (bc.tracer || 1));
     this.recoil = 1;              // patea el cañón
     this.ejectCasing(muzzlePos);  // expulsa casquillo
-    // Sonido de disparo (el arma del jugador va centrada)
-    this.onFire?.(bc.explodeR ? 'explosive' : (bc.damageMul || 1) >= 2 ? 'heavy' : 'standard');
+    // Sonido de disparo: estilo de la torreta + cadencia (procedural con la rate)
+    this.onFire?.(this.shotKind, this.rate);
   }
 
   getCurrentBurstConfig() {
@@ -285,7 +288,7 @@ export class TurretSystem {
           this.burstCooldown = burstConfig?.burstInterval || this.bulletCfg.burstInterval || 0.08;
         }
         this.fire(target);
-        this.cooldown = 1 / this.rate;
+        this.cooldown = 1 / (this.rate * (this.rateScale || 1));
       } else {
         this.currentTarget = null;
         this.cooldown = 0.05;

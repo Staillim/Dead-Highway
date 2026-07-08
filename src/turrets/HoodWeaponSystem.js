@@ -31,10 +31,11 @@ function resolveMeshGroup(model, paths) {
 }
 
 export class HoodWeaponSystem {
-  constructor(scene, vehicle, zombieSystem) {
+  constructor(scene, vehicle, zombieSystem, { onFire } = {}) {
     this.scene = scene;
     this.vehicle = vehicle;
     this.zombies = zombieSystem;
+    this.onFire = onFire;
     this.cooldown = 0;
     this.muzzleIdx = 0;
     this.muzzle = new THREE.Vector3();
@@ -142,8 +143,15 @@ export class HoodWeaponSystem {
       if (hoodNode) {
         const target = this.pickTarget();
         this.currentTarget = target;
-        this.fire(target);
-        this.cooldown = 1 / cfg.fireRate;
+        // SOLO dispara si hay un enemigo delante (antes disparaba siempre hacia
+        // adelante aunque no hubiera zombis → "dispara sin enemigos").
+        if (target) {
+          this.fire(target);
+          this.onFire?.();
+          this.cooldown = 1 / cfg.fireRate;
+        } else {
+          this.cooldown = 0.12; // reintenta pronto, sin gastar disparos
+        }
       }
     }
 

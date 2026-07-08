@@ -9,8 +9,16 @@
   },
   "hud": {
     "run-score": {
-      "xPct": 47.48,
-      "yPct": 13.76
+      "xPct": 46.37,
+      "yPct": 4.76
+    },
+    "run-speed": {
+      "xPct": 94.9,
+      "yPct": 3.39
+    },
+    "run-distance": {
+      "xPct": 6.99,
+      "yPct": 11.47
     }
   },
   "sounds": {
@@ -22,8 +30,8 @@
       "zombie": 0.05
     },
     "car": {
-      "base": 40,
-      "type": "square",
+      "base": 84,
+      "type": "sawtooth",
       "rev": 1
     },
     "sirens": {
@@ -49,6 +57,7 @@
         "lfoType": "square"
       }
     },
+    "shotOverride": null,
     "muted": false
   }
 }

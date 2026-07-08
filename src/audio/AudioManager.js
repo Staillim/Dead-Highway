@@ -21,6 +21,7 @@ export class AudioManager {
     this.noiseBuffer = null;
     this.volumes = { master: 0.8, engine: 0.5, sfx: 0.9, siren: 0.55, zombie: 0.7 };
     this.carSound = { base: 90, type: 'sawtooth', rev: 1.0 }; // motor del jugador (por coche)
+    this.shotOverride = null; // fuerza un estilo de disparo (elegido en dev); null = el de la torreta
     this.sirenParams = JSON.parse(JSON.stringify(SIREN_PARAMS)); // editable en dev
     this._sirens = new Map();
     this._duck = 1; // atenuación temporal del master (pantalla de muerte)
@@ -54,10 +55,11 @@ export class AudioManager {
     if (cfg.volumes) this.setVolumes(cfg.volumes);
     if (cfg.car) this.setCarSound(cfg.car);
     if (cfg.sirens) for (const k of Object.keys(cfg.sirens)) Object.assign(this.sirenParams[k] || (this.sirenParams[k] = {}), cfg.sirens[k]);
+    if ('shotOverride' in cfg) this.shotOverride = cfg.shotOverride || null;
     if (typeof cfg.muted === 'boolean') this.setMuted(cfg.muted);
   }
   toConfig() {
-    return { volumes: { ...this.volumes }, car: { ...this.carSound }, sirens: JSON.parse(JSON.stringify(this.sirenParams)), muted: !this.enabled };
+    return { volumes: { ...this.volumes }, car: { ...this.carSound }, sirens: JSON.parse(JSON.stringify(this.sirenParams)), shotOverride: this.shotOverride, muted: !this.enabled };
   }
 
   setMuted(m) {
@@ -75,8 +77,10 @@ export class AudioManager {
   }
 
   setCarSound(cfg) {
+    // El motor (ruido+LFO) usa carSound en setEngineSpeed cada frame → basta con
+    // actualizar los valores; NO hay `osc` que retunear (antes esto tiraba error y
+    // por eso "cambiar el sonido no cambiaba nada").
     Object.assign(this.carSound, cfg || {});
-    if (this.engine) this.engine.osc.type = this.carSound.type;
   }
 
   // --- MOTOR del jugador (loop). NO es un oscilador (zumbaba/repelía): es RUIDO
@@ -170,30 +174,52 @@ export class AudioManager {
     return g;
   }
 
-  // Disparo SECO y corto (metralleta): un "tak" muy breve → el fuego rápido suena
-  // a "brrrt", no a cañón. CRACK cortísimo + tono mecánico que baja. Nada de boom
-  // largo salvo en 'heavy'.
-  gunshot(kind = 'standard', x = 0, z = 0) {
+  // Disparo con VARIOS estilos (uno por torreta) para elegir el que guste. El
+  // override del dev (shotOverride) manda sobre el de la torreta. Cada estilo es
+  // corto → en ráfaga suena a "brrrt". `rate` (disparos/s) hace el disparo un
+  // pelín más corto/agudo cuando se dispara más rápido (procedural con la cadencia).
+  gunshot(kind = 'standard', x = 0, z = 0, rate = 8) {
     this.ensure(); if (!this.ctx) return;
+    const style = this.shotOverride || kind || 'standard';
     const t = this.ctx.currentTime;
-    const heavy = kind === 'heavy';
-    const out = this._out('sfx', x, z, heavy ? 0.55 : 0.4);
-    // CRACK cortísimo (ataque): ruido high-passed ~15ms
-    const crack = this.ctx.createBufferSource(); crack.buffer = this.noiseBuffer;
-    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = heavy ? 1300 : 2300;
-    const cEnv = this.ctx.createGain(); cEnv.gain.setValueAtTime(1, t); cEnv.gain.exponentialRampToValueAtTime(0.001, t + (heavy ? 0.03 : 0.016));
-    crack.connect(hp); hp.connect(cEnv); cEnv.connect(out); crack.start(t); crack.stop(t + 0.04);
-    // "TAK" tonal seco: cuadrada que cae rápido → mecánico, no ruidito plano
+    const out = this._out('sfx', x, z, style === 'mg' || style === 'heavy' ? 0.6 : style === 'plasma' ? 0.42 : 0.45);
+    const noise = () => { const s = this.ctx.createBufferSource(); s.buffer = this.noiseBuffer; return s; };
+    const tight = Math.max(0.6, Math.min(1.4, 10 / (rate + 4))); // más rápido → más corto
+
+    if (style === 'plasma') {
+      // ENERGÍA "pew": zap tonal que baja rápido + brillo
+      const osc = this.ctx.createOscillator(); osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(1400, t); osc.frequency.exponentialRampToValueAtTime(240, t + 0.09 * tight);
+      const oe = this.ctx.createGain(); oe.gain.setValueAtTime(0.5, t); oe.gain.exponentialRampToValueAtTime(0.001, t + 0.11 * tight);
+      const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1200; bp.Q.value = 1.4;
+      osc.connect(bp); bp.connect(oe); oe.connect(out); osc.start(t); osc.stop(t + 0.14);
+      const sh = noise(); const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3000;
+      const se = this.ctx.createGain(); se.gain.setValueAtTime(0.3, t); se.gain.exponentialRampToValueAtTime(0.001, t + 0.02);
+      sh.connect(hp); hp.connect(se); se.connect(out); sh.start(t); sh.stop(t + 0.03);
+      return;
+    }
+
+    // Estilos por ruido+tono: rifle (agudo/seco), mg (grave/chunky), heavy, standard
+    const cfg = style === 'mg'    ? { hpF: 1200, decC: 0.028, toneF: 300, toneTo: 90,  decT: 0.045, tv: 0.34, boom: 0.4, boomTo: 45 }
+              : style === 'heavy' ? { hpF: 1100, decC: 0.032, toneF: 250, toneTo: 78,  decT: 0.05,  tv: 0.4,  boom: 0.5, boomTo: 42 }
+              : style === 'rifle' ? { hpF: 2500, decC: 0.02,  toneF: 520, toneTo: 180, decT: 0.03,  tv: 0.3,  boom: 0.22, boomTo: 90 }
+              : style === 'pistol'? { hpF: 2200, decC: 0.014, toneF: 480, toneTo: 170, decT: 0.026, tv: 0.2,  boom: 0,   boomTo: 0 }
+              :                     { hpF: 2300, decC: 0.016, toneF: 430, toneTo: 150, decT: 0.032, tv: 0.26, boom: 0,   boomTo: 0 };
+    // CRACK
+    const crack = noise(); const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = cfg.hpF;
+    const ce = this.ctx.createGain(); ce.gain.setValueAtTime(1, t); ce.gain.exponentialRampToValueAtTime(0.001, t + cfg.decC * tight);
+    crack.connect(hp); hp.connect(ce); ce.connect(out); crack.start(t); crack.stop(t + 0.05);
+    // TONO mecánico
     const osc = this.ctx.createOscillator(); osc.type = 'square';
-    osc.frequency.setValueAtTime(heavy ? 260 : 430, t); osc.frequency.exponentialRampToValueAtTime(heavy ? 80 : 150, t + 0.03);
-    const oEnv = this.ctx.createGain(); oEnv.gain.setValueAtTime(heavy ? 0.4 : 0.26, t); oEnv.gain.exponentialRampToValueAtTime(0.001, t + 0.035);
-    osc.connect(oEnv); oEnv.connect(out); osc.start(t); osc.stop(t + 0.05);
-    // Solo 'heavy' lleva un thump grave corto (peso del cañón pesado)
-    if (heavy) {
+    osc.frequency.setValueAtTime(cfg.toneF, t); osc.frequency.exponentialRampToValueAtTime(cfg.toneTo, t + cfg.decT * tight);
+    const oe = this.ctx.createGain(); oe.gain.setValueAtTime(cfg.tv, t); oe.gain.exponentialRampToValueAtTime(0.001, t + (cfg.decT + 0.005) * tight);
+    osc.connect(oe); oe.connect(out); osc.start(t); osc.stop(t + 0.06);
+    // THUMP grave (solo estilos pesados)
+    if (cfg.boom > 0) {
       const b = this.ctx.createOscillator(); b.type = 'sine';
-      b.frequency.setValueAtTime(120, t); b.frequency.exponentialRampToValueAtTime(45, t + 0.08);
-      const bEnv = this.ctx.createGain(); bEnv.gain.setValueAtTime(0.45, t); bEnv.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
-      b.connect(bEnv); bEnv.connect(out); b.start(t); b.stop(t + 0.12);
+      b.frequency.setValueAtTime(cfg.toneF * 0.5, t); b.frequency.exponentialRampToValueAtTime(cfg.boomTo, t + 0.08);
+      const be = this.ctx.createGain(); be.gain.setValueAtTime(cfg.boom, t); be.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+      b.connect(be); be.connect(out); b.start(t); b.stop(t + 0.12);
     }
   }
 

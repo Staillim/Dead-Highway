@@ -158,8 +158,11 @@ Todo el sonido es **sintetizado con Web Audio** (sin archivos → cero descargas
 - **Motor** por coche (loop, volumen bajo y suave; sub sine para no "sonar roto"). El tono
   sube dentro de cada marcha y CAE al cambiar → **cada 60 km/h** se oye el cambio y el motor
   va "mejorando" (blip de cambio incluido). Cada coche trae su `sound` en `GARAGE_CARS`.
-- **Disparos** de torreta (por tipo de bala), **impactos**/choques, **explosiones**
-  (misil/gordo), **gruñido** y **muerte** de zombis, **pickups**.
+- **Disparos** con **estilo por torreta** (`TURRET_STATS.shot`): Cañón Rojo=`rifle`,
+  Sci-Fi=`plasma`, Militar=`mg`; el arma de capó usa `pistol`. La **cadencia** modula el
+  disparo (más rápido → más corto). En el editor hay un selector "Disparo" para elegir el
+  que más guste (override global). **Impactos**/choques, **explosiones** (misil/gordo),
+  **gruñido** (vocal) y **muerte** de zombis, **pickups**.
 - **Sirenas** variadas (ambulancia/bombero/policía) para el tráfico de emergencia: loop
   paneado por X y atenuado por distancia (se oyen llegar y pasar).
 - **Envolvente**: cada sfx se panea (StereoPanner) y baja de volumen con la distancia.
@@ -168,6 +171,14 @@ Todo el sonido es **sintetizado con Web Audio** (sin archivos → cero descargas
 - **Editable en modo dev** (sección SONIDOS): volúmenes por bus, motor del coche (Hz/onda),
   botones de prueba. Se **guarda GLOBAL** en `run-config.json` (`sounds`) y lo carga el juego
   al arrancar (`RunConfig.getRunSounds` → `audio.applyConfig`).
+
+## 🔫 Torretas: stats por torreta + mejoras — `TurretData.js`
+
+Cada torreta tiene `rangeMul`/`damageMul`/`fireRateMul` (Cañón Rojo < Sci-Fi < Militar), que
+se multiplican sobre `GAMEPLAY.turret` y encima aplican las mejoras del garaje (nivel de
+torreta = +bonus de alcance). El **alcance base** se redujo (140→105). La **cadencia escala
+con la dificultad** (`rateScale` 0.6→1.0): temprano dispara menos, como salen menos zombis.
+El **arma de capó** ya NO dispara sin enemigos (antes disparaba siempre hacia adelante).
 
 ## 🏜️ Arena tileable + tarjetas Survival Drive
 

@@ -87,6 +87,9 @@ export class RunDevOverlay {
       <label class="dev-slider"><span>Onda</span>
         <select data-snd="type"><option value="sawtooth">saw</option><option value="square">square</option><option value="triangle">tri</option><option value="sine">sine</option></select>
         <b></b></label>
+      <label class="dev-slider"><span>Disparo</span>
+        <select data-snd="shot"><option value="">torreta</option><option value="rifle">rifle</option><option value="plasma">plasma</option><option value="mg">metralleta</option><option value="heavy">pesado</option><option value="pistol">pistola</option><option value="standard">estándar</option></select>
+        <b></b></label>
       <div class="dev-row">
         <button data-dev="snd-shot">🔫 Disparo</button>
         <button data-dev="snd-boom">💥 Explosión</button>
@@ -144,6 +147,12 @@ export class RunDevOverlay {
     typeSel.value = audio.carSound.type;
     baseInp.addEventListener('input', () => { baseInp.nextElementSibling.textContent = baseInp.value; audio.setCarSound({ base: +baseInp.value }); });
     typeSel.addEventListener('change', () => audio.setCarSound({ type: typeSel.value }));
+    // Estilo de disparo (override global; vacío = el de la torreta equipada)
+    const shotSel = panel.querySelector('select[data-snd="shot"]');
+    if (shotSel) {
+      shotSel.value = audio.shotOverride || '';
+      shotSel.addEventListener('change', () => { audio.shotOverride = shotSel.value || null; audio.ensure(); audio.gunshot(shotSel.value || 'rifle', 0, 0, 10); });
+    }
 
     panel.addEventListener('click', (e) => {
       const b = e.target.closest('[data-dev]');
@@ -156,7 +165,7 @@ export class RunDevOverlay {
       else if (a === 'combo') this.hud.setCombo(20, 5, 12480);
       else if (a === 'wave') this.hud.notifyWave(7);
       else if (a === 'hit') this._previewHit();
-      else if (a === 'snd-shot') { audio.ensure(); audio.gunshot('standard'); }
+      else if (a === 'snd-shot') { audio.ensure(); audio.gunshot(audio.shotOverride || 'rifle', 0, 0, 10); }
       else if (a === 'snd-boom') { audio.ensure(); audio.explosion(0, -5); }
       else if (a === 'snd-groan') { audio.ensure(); audio.zombieGroan(0, -5); }
       else if (a === 'snd-siren') { audio.ensure(); audio.startSiren('dev-test', 'ambulance', 0, -4); setTimeout(() => audio.stopSiren('dev-test'), 2600); }

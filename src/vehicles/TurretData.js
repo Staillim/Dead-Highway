@@ -10,13 +10,14 @@ export const TURRET_NAMES = {
 //  · damageMul   → daño por bala
 //  · fireRateMul → disparos por segundo
 //  · rarity      → estrellas (UI)
+// `shot` = estilo de sonido de disparo (cada torreta suena distinto): rifle / plasma / mg.
 export const TURRET_STATS = {
-  'red_gun_turret_01':       { rangeMul: 0.9,  damageMul: 1.0, fireRateMul: 1.0,  rarity: 1 },
-  'sci-fi+turret+3d+model':  { rangeMul: 1.05, damageMul: 1.3, fireRateMul: 1.18, rarity: 3 },
-  'military+turret+3d+model':{ rangeMul: 1.2,  damageMul: 1.6, fireRateMul: 1.08, rarity: 5 }
+  'red_gun_turret_01':       { rangeMul: 0.9,  damageMul: 1.0, fireRateMul: 1.0,  rarity: 1, shot: 'rifle' },
+  'sci-fi+turret+3d+model':  { rangeMul: 1.05, damageMul: 1.3, fireRateMul: 1.18, rarity: 3, shot: 'plasma' },
+  'military+turret+3d+model':{ rangeMul: 1.2,  damageMul: 1.6, fireRateMul: 1.08, rarity: 5, shot: 'mg' }
 };
 
-const DEFAULT_STATS = { rangeMul: 1, damageMul: 1, fireRateMul: 1, rarity: 1 };
+const DEFAULT_STATS = { rangeMul: 1, damageMul: 1, fireRateMul: 1, rarity: 1, shot: 'standard' };
 
 export function turretStatsById(id) {
   return TURRET_STATS[id] || DEFAULT_STATS;

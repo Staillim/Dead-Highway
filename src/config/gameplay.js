@@ -127,7 +127,7 @@ export const GAMEPLAY = {
     waveDurS: [7, 15],     // duración de la oleada [inicio, tope por dificultad]
     calmDurS: [3, 6],      // duración de la calma [tope por dificultad, inicio]
     waveSpawnS: [0.9, 2.0],// intervalo entre ráfagas DENTRO de una oleada
-    burstBase: 4,          // zombis por ráfaga (base)
+    burstBase: 3,          // zombis por ráfaga (base) — primeras oleadas más suaves
     burstMax: 11,          // extra por dificultad (oleadas mucho más densas al avanzar)
     normalBiasBase: 0.42,  // fracción de la ráfaga que es zombi NORMAL (sube con la distancia)
     normalBiasMax: 0.18,   // +extra de sesgo a normal al máximo de dificultad (tope ~60%)
