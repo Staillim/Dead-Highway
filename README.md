@@ -256,14 +256,25 @@ Asegurate de que existan los archivos correspondientes en `assets/models/` y el 
 - [x] Zombis: 3 tipos (Normal/Corredor/Gordo) con IA, animación procedural por huesos y oleadas
 - [x] Torreta automática que apunta y dispara sola (GDD §5)
 - [x] Agarre de flacos al carro + sacudir/rascar para soltarlos
-- [x] Muerte con desmembramiento (gibs + sangre) y explosión del gordo por proximidad
-- [ ] Sistema de combustible
-- [ ] Zombies y combate automático
-- [ ] Habilidades (Escudo, Misiles, EMP, Nitro)
-- [ ] Modo Infinito y Modo Niveles
-- [ ] Economía completa y tienda
-- [ ] Monetización y live-ops
+- [x] Muerte con desmembramiento (gibs + sangre); muerte procedural (desplome con peso)
+- [x] Sistema de combustible + bidones drop + mejora de capacidad de tanque
+- [x] Zombis por OLEADAS con curva de dificultad (más rápido/denso con la distancia)
+- [x] Sistema de balas: tipos de munición (rápida/perforante/pesada/explosiva) por nivel de torreta
+- [x] Tráfico en contravía (ambulancias/bomberos/minivan) con color variado + acabado metálico
+- [x] Botón AVANZAR (▲/W) con velocidad que se mantiene (ratchet) + líneas de velocidad periféricas
+- [x] Combo + score (multiplicador x1→x8) con monedas extra
+- [x] Recolectables en carrera: monedas / gemas / botiquín
+- [x] Habilidades activas: **Misil** + **EMP** (botones con cooldown) · pasivas: Escudo, Nitro
+- [x] Mitigación de choque por accesorios (parachoques/blindaje/púas reducen daño)
+- [x] Modo noche / ciclo día↔noche (luna + estrellas) + luces de vehículo (faros/traseras) + humo de escape
+- [x] Ruedas procedurales que giran (detección de la rueda horneada por vértices)
+- [x] Modo Dev ampliado: preview de clips FBX (scream/crawl/biting/death) + objetos editables (luces/humo/llantas) con gizmo
+- [x] Economía/meta: misiones diarias, cajas, eventos, tienda (bundles + capacidad de tanque), pase de batalla
+- [ ] Modo Niveles (mapa de niveles con objetivos)
+- [ ] Monetización / live-ops (ruleta diaria, ads recompensados, track de recompensas del pase)
 - [ ] Empaquetado con Capacitor
+
+Ver **[docs/SISTEMAS.md](docs/SISTEMAS.md)** para el catálogo detallado de cada sistema y su archivo.
 
 ---
 

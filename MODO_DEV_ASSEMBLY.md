@@ -344,3 +344,30 @@ PaintCustomizer.apply(car, '#ff3300');
 - Cada carro es independiente: cambiar el socket de un carro no afecta a otro.
 - Las torretas y accesorios deben mantener una escala y orientación consistente para que el sistema funcione sin overrides.
 - Si una variante específica no calza, se prefiere corregir el modelo antes de llenar el proyecto de overrides.
+
+---
+
+## 🆕 Ampliaciones del Modo Dev
+
+### Editor de zombis
+- Carga el zombi **completo** (mesh + esqueleto vía `SkeletonUtils.clone`, para no romper
+  el binding) normalizado por **huesos** (no por el bbox del mesh).
+- Edición de **postura por hueso** con el gizmo + sliders de intensidad/hunch.
+- **Preview de animaciones (Mixamo)**: botones Scream / Crawl / Biting (clips FBX) y
+  **Death** (desplome **procedural**, igual que el juego). Botón Stop restaura la pose.
+
+### Extras del carro (luces / humo / llantas)
+Sección "Extras del carro" con botones **💡 Luz · 💨 Humo · 🛞 Rueda**. Cada objeto:
+- Se **agrega**, se **mueve con el gizmo** compartido y se **guarda** en el JSON del carro
+  bajo `socketData.extras = { lights:[], smoke:[], wheels:[] }`.
+- **Luces**: point/spot con posición/rotación + sliders de intensidad, color, alcance y
+  cono (spot). Se ven iluminar el carro en el editor.
+- **Humo**: emisores (p.ej. escapes) con tasa/tamaño; preview de puffs.
+- **Llantas**: neumático procedural (llanta + rin + cruz de rayos) con posición/escala,
+  **girando** en preview para ver cómo rodaría.
+
+Convención: `position` en el espacio **local del `carModel`** (igual que los sockets),
+`rotation` en radianes, `scale` escalar. Al ser hijos del `carModel`, en la partida
+heredan la normalización y el giro del holder. `PlayerVehicle` lee `extras` para
+aplicarlos (luces como PointLight/SpotLight, llantas como spinners, humo alimentando el
+`SmokeSystem`).

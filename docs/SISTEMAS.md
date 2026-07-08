@@ -1,0 +1,97 @@
+# Dead Highway — Catálogo de Sistemas
+
+Referencia detallada de cada apartado del juego y su archivo. Actualizado tras la
+tanda de sistemas nuevos (habilidades, modo noche, recolectables, etc.).
+
+---
+
+## 🎮 Partida (RunScene) — `src/scenes/RunScene.js`
+
+Orquesta la carrera. Orden por frame: controller → carril → carro → mundo →
+tráfico/recolectables → zombis/combate → habilidades → efectos → cámara → HUD.
+"El mundo viene hacia el jugador": el carro casi fijo cerca del origen mirando −Z,
+el mundo viaja hacia +Z. Sin shadow maps (sombra de contacto blob).
+
+### Velocidad y control — `src/modes/RunController.js`
+- Botón **AVANZAR** (▲ / tecla **W** / ↑): mantenerlo **acumula velocidad extra que
+  se conserva** (ratchet, nunca baja sola). La base sube gradual con la distancia.
+  Solo el impacto la merma temporalmente (recupera solo). `speed.accelRate`, `boostMul`.
+- Combustible: baja con el tiempo (más rápido al avanzar); 0 = fin de carrera. Techo
+  `fuelMax` mejorable (ver Tienda). Bidones drop lo recargan (`PickupSystem`).
+- Carriles: swipe / flechas / A-D (`LaneInput` + `LaneSystem`), cambio ágil según llantas.
+
+### Combate
+- **Torreta automática** — `src/turrets/TurretSystem.js`: apunta al zombi más cercano,
+  dispara sola. **Tipos de bala** (standard/rapid/piercing/heavy/explosive) según nivel
+  de torreta (`gameplay.js.turret.ammoTiers`). Colisión por **barrido de segmento**
+  (no tunneling). Fogonazo star-burst + casquillos + retroceso + chispas de impacto.
+- **Arma de capó** — `src/turrets/HoodWeaponSystem.js`: dispara al frente.
+- **Habilidades activas** — `src/abilities/AbilitySystem.js`: **Misil** (mata en radio en
+  el foco de la horda) y **EMP** (aturde/mata zombis + frena el tráfico). 2 botones en el
+  HUD con overlay de cooldown.
+
+### Zombis — `src/zombies/ZombieSystem.js`
+- 3 tipos (normal/runner/fat). **Oleadas**: fase de ataque (ráfagas densas) ↔ calma,
+  escalando con la distancia (`gameplay.js.zombies`: waveDurS/calmDurS/burst/speedRamp).
+  Banner "OLEADA N".
+- Comportamiento: vagabundeo (rumbos variados) → detectar coche (scream) → perseguir →
+  biting/atropello. Muerte **procedural** (desplome con peso), explosión del gordo.
+- Animaciones FBX Mixamo reencauzadas al esqueleto Tripo — `src/zombies/ZombieAnimations.js`.
+- Rig procedural de respaldo — `src/zombies/ZombieRig.js`.
+
+### Tráfico — `src/traffic/TrafficSystem.js`
+En contravía (vienen de frente). Ambulancias/bomberos/minivan con **tinte de color
+variado + acabado semi-metálico**. Pool grande, selección al azar (aparecen todos los
+tipos). `empMul` los frena con el EMP.
+
+### Recolectables — `src/collectibles/`
+- `PickupSystem.js`: bidones de gasolina.
+- `RunPickups.js`: **monedas / gemas / botiquín** (repara 1 corazón). Suman al score/pago.
+
+### Mundo y ambiente — `src/environment/`, `src/vfx/`
+- Carretera por chunks (`RoadSystem`), props medios/cercanos (`MidProps`/`NearProps`,
+  coches destruidos con color), cielo (`SkyDome`), fondo lejano (`FarBackdrop`).
+- **Modo noche / ciclo** — `src/vfx/NightMode.js`: luna + estrellas, fog/exposición/luces
+  hacia paleta nocturna; se aplica sobre el bioma por distancia.
+- **Luces de vehículo** — `src/vfx/VehicleLights.js`: faros + traseras, encienden de noche.
+- **Humo** — `src/vfx/SmokeSystem.js`: escape del carro, arrastrado por la velocidad.
+- **Efectos de velocidad** — `src/vfx/SpeedEffects.js`: polvo de ruedas + líneas de
+  velocidad **periféricas** (bordes, hacia la cámara).
+
+### HUD de partida — `src/ui-hud/RunHUD.js` + `src/styles/run.css`
+DOM puro. Arriba: pausa, corazones, distancia, velocidad, **PUNTOS** + popup **COMBO xN**.
+Abajo-izq: **escudo** + botones **Misil/EMP** (cooldown). Abajo-centro: **barra de
+combustible** compacta. Abajo-der: botón **AVANZAR** ▲.
+
+---
+
+## 🏰 Lobby / Garaje — `src/ui/LobbyUI.js` + `src/styles/lobby.css`
+
+- Vistas: garaje (carro + JUGAR), coches, torretas, mejoras.
+- **Mejoras** que afectan la partida — `src/save/UpgradeStats.js`: blindaje (hp),
+  torreta (daño/cadencia + munición), motor (velocidad), llantas (manejo), nitro
+  (techo del acelerador), escudo (cargas que absorben choques). Mitigación de choque
+  por accesorios equipados.
+- **Apartados** (modales): **Tienda** (bundles + capacidad de tanque `ShopFuelUpgrade`),
+  **Cajas** (loot boxes con tabla ponderada), **Eventos** (hitos por stat acumulada),
+  **Misiones** diarias (`src/save/Missions.js`).
+- Recompensas de fin de carrera — `src/save/Rewards.js` (monedas/gemas/XP de pase).
+- Estado persistente — `src/save/PlayerState.js` (localStorage).
+
+---
+
+## 🛠️ Modo Dev (Assembly Editor) — `src/tools/assembly-editor/`
+
+- Montaje de accesorios sobre el carro con gizmo TransformControls + guardado de sockets.
+- **Editor de zombis**: cargar zombi completo (SkeletonUtils.clone), editar postura por
+  hueso, **preview de animaciones** (scream/crawl/biting FBX + muerte procedural).
+- **Extras editables** (`socketData.extras`): agregar **luces / humo / llantas** como
+  objetos, moverlos con el gizmo y guardarlos. `PlayerVehicle` puede leer `extras` para
+  aplicarlos en la partida (ver notas de integración en el editor).
+
+---
+
+## 📁 Config central — `src/config/gameplay.js`
+
+Todos los tunables: velocidad, carriles, tráfico, zombis/oleadas, torreta/balas, fuel,
+combo, biomas, VFX, budget de draw calls.
