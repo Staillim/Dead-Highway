@@ -8,6 +8,8 @@ import { PaintCustomizer } from '../../materials/PaintCustomizer.js';
 import { ZombieRig } from '../../zombies/ZombieRig.js';
 import { loadZombieClips } from '../../zombies/ZombieAnimations.js';
 import { clone as skeletonClone } from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { measureModel } from '../../utils/measure.js';
+import { dustPuffTexture } from '../../vfx/SpriteTextures.js';
 
 // --- Descubrir assets con Vite ---------------------------------------------
 const assetGlobs = {
@@ -82,7 +84,14 @@ const state = {
   activeGroupSelector: null,
   selectorCylinder: null,
   selectorWire: null,
-  highlightedMeshes: []
+  highlightedMeshes: [],
+  // Extras del carro (colocables por el dev): luces, emisores de humo y llantas.
+  // `extras` es la data serializable (va al JSON); `extraObjects` son sus objetos
+  // 3D paralelos en escena (marcadores/luces/ruedas), nunca serializados.
+  extras: { lights: [], smoke: [], wheels: [] },
+  extraObjects: { lights: [], smoke: [], wheels: [] },
+  selectedExtra: null,
+  _carLocalBox: null
 };
 
 // --- Escena 3D -------------------------------------------------------------
@@ -132,6 +141,7 @@ function animate() {
     clipMixer.update(dt);
     syncSkeletonJoints();   // las bolitas del esqueleto siguen la animación
   }
+  updateExtrasPreview(dt);   // ruedas girando + humo subiendo (preview del dev)
   renderer.render(scene, camera);
 }
 animate();

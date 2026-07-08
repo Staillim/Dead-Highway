@@ -144,9 +144,9 @@ export const GAMEPLAY = {
   // Tráfico EN CONTRAVÍA: coches normales que vienen de frente (el jugador va al
   // revés). Vienen del horizonte y cierran rápido; hay que esquivarlos.
   traffic: {
-    spawnChance: 0.6,
-    minGapZ: 40,
-    maxLanesBlocked: 2,    // nunca tapar todos los carriles con tráfico
+    spawnChance: 0.85,     // más tráfico viniendo
+    minGapZ: 26,           // más juntos (pero siempre con carril de escape)
+    maxLanesBlocked: 3,    // nunca tapar los 4 carriles con tráfico
     oncomingSpeed: 9,      // m/s adicionales sobre el flujo del mundo
     hitDepth: 2.4
   },

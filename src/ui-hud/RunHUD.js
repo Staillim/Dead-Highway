@@ -26,7 +26,6 @@ export class RunHUD {
         <div id="run-hud">
           <button id="run-pause-btn" aria-label="Pausa">${PAUSE_ICON}</button>
           <div class="run-chip" id="run-hearts">❤❤❤</div>
-          <div class="run-chip" id="run-shield" hidden>🛡<b id="run-shield-n">0</b></div>
           <div class="run-chip" id="run-distance"><span id="run-distance-val">0 m</span><small>DISTANCIA</small></div>
           <div class="run-chip" id="run-speed">0 km/h</div>
         </div>
@@ -37,6 +36,7 @@ export class RunHUD {
           <svg class="fuel-ico" viewBox="0 0 24 24" fill="currentColor"><path d="M6 3h6a1 1 0 0 1 1 1v16H5V4a1 1 0 0 1 1-1zm1 2v4h4V5zm9.5 3.7L18 7.2v9.6a1.1 1.1 0 0 0 2.2 0V10a1.4 1.4 0 0 0-.5-1.1zM4 20h10v1.4H4z"/></svg>
           <div class="fuel-track"><div id="run-fuel-fill"></div></div>
         </div>
+        <div id="run-shield" hidden>🛡<b id="run-shield-n">0</b></div>
         <button id="run-gas" aria-label="Avanzar">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.5l8.5 9.5H15.2V20.5H8.8V13H3.5z"/></svg>
         </button>

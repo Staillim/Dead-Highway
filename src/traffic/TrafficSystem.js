@@ -7,13 +7,13 @@ import { normalizeModel } from '../utils/measure.js';
 // frente y hay que esquivar. Reutiliza la flota optimizada (ambulancias,
 // bomberos, minivan multicolor). Pool + colisión AABB por carril.
 const MODELS = [
-  { url: '/models/traffic/ambulance_a.glb', len: 5.2, count: 2 },
-  { url: '/models/traffic/ambulance_b.glb', len: 5.2, count: 1 },
-  { url: '/models/traffic/ambulance_c.glb', len: 5.2, count: 1 },
-  { url: '/models/traffic/firetruck_a.glb', len: 7.5, count: 1 },
+  { url: '/models/traffic/ambulance_a.glb', len: 5.2, count: 3 },
+  { url: '/models/traffic/ambulance_b.glb', len: 5.2, count: 2 },
+  { url: '/models/traffic/ambulance_c.glb', len: 5.2, count: 2 },
+  { url: '/models/traffic/firetruck_a.glb', len: 7.5, count: 2 },
   { url: '/models/traffic/firetruck_b.glb', len: 7.5, count: 1 },
   { url: '/models/traffic/firetruck_c.glb', len: 7.5, count: 1 },
-  { url: '/models/traffic/minivan.glb', len: 4.6, count: 4, tintable: true }
+  { url: '/models/traffic/minivan.glb', len: 4.6, count: 7, tintable: true }
 ];
 
 // Paleta de tintes para dar VARIEDAD de color al tráfico (cada vehículo distinto)
@@ -56,13 +56,14 @@ export class TrafficSystem {
         // vehículos variados y con mejor terminación (no planos/apagados).
         const tint = new THREE.Color(TRAFFIC_TINTS[this.tintIdx % TRAFFIC_TINTS.length]);
         this.tintIdx += (this.tintIdx % 2) + 1; // salta para no repetir patrón
-        const strength = def.tintable ? 0.6 : 0.3; // minivan más fuerte; resto sutil
+        const strength = def.tintable ? 0.7 : 0.45; // teñido más marcado (no opaco)
         model.traverse((o) => {
           if (o.isMesh && o.material) {
             o.material = o.material.clone();
             o.material.color.lerp(tint, strength);
-            if (o.material.metalness !== undefined) o.material.metalness = Math.min(1, (o.material.metalness || 0) + 0.25);
-            if (o.material.roughness !== undefined) o.material.roughness = Math.max(0.28, (o.material.roughness ?? 0.7) - 0.12);
+            o.material.color.offsetHSL(0, 0.22, 0.06); // más saturación y luz → sale de lo apagado
+            if (o.material.metalness !== undefined) o.material.metalness = Math.min(1, (o.material.metalness || 0) + 0.3);
+            if (o.material.roughness !== undefined) o.material.roughness = Math.max(0.25, (o.material.roughness ?? 0.7) - 0.15);
           }
         });
 

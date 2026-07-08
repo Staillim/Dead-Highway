@@ -118,7 +118,9 @@ export class NearProps {
 
   async load() {
     const cfg = GAMEPLAY.env.near;
-    const tints = [0xb8b2a4, 0x7f5546, 0x5a6a72, 0x6d6a4f];
+    // Colores de coche (variados) — antes se multiplicaba por tonos oscuros y
+    // quedaban apagados/negros. Ahora se MEZCLA hacia un color con luz/saturación.
+    const tints = [0xc74a3a, 0x3f7fc0, 0x4fae5a, 0xd0a83a, 0xb6bac0, 0x9a5fc0];
     for (let i = 0; i < this.wreckCount; i++) {
       try {
         const model = await AssetLoader.loadModel('/models/environment/obstacles/destroyed_car.glb');
@@ -134,7 +136,10 @@ export class NearProps {
         model.traverse((child) => {
           if (child.isMesh && child.material) {
             child.material = child.material.clone();
-            child.material.color?.multiply(new THREE.Color(tints[i % tints.length]));
+            if (child.material.color) {
+              child.material.color.lerp(new THREE.Color(tints[i % tints.length]), 0.5);
+              child.material.color.offsetHSL(0, 0.15, 0.05); // sale de lo apagado
+            }
           }
         });
         group.add(model);

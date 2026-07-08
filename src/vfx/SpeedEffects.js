@@ -67,16 +67,17 @@ export class SpeedEffects {
       depthWrite: false,
       depthTest: false
     });
-    // Líneas de velocidad que RADIAN desde el punto de fuga y salen hacia la
-    // pantalla (efecto "warp"): nacen lejos y cerca del centro, y se abren hacia
-    // afuera mientras vienen hacia la cámara. Nada de subir en vertical.
+    // Líneas de velocidad PERIFÉRICAS: viven en los bordes izq/der (nunca por el
+    // centro) y rushean hacia la cámara casi verticales, como el paisaje pasando
+    // rápido de costado. Nada de converger/salir del medio.
     this.streaks = [];
-    const n = GAMEPLAY.vfx.streaks * 2; // más líneas para que el efecto se lea
+    const n = GAMEPLAY.vfx.streaks * 2;
     const streakGeo = new THREE.PlaneGeometry(0.03, 1.0);
     for (let i = 0; i < n; i++) {
       const m = new THREE.Mesh(streakGeo, this.streakMat);
-      m.userData.angle = Math.random() * Math.PI * 2;
-      m.userData.p = Math.random();       // progreso 0 (lejos/centro) → 1 (cerca/borde)
+      m.userData.side = i % 2 === 0 ? -1 : 1;
+      m.userData.slot = -1.2 + Math.random() * 3.0; // altura dentro de la banda lateral
+      m.userData.p = Math.random();                 // progreso 0 (lejos) → 1 (cerca/pasa)
       this.streakGroup.add(m);
       this.streaks.push(m);
     }
@@ -144,16 +145,16 @@ export class SpeedEffects {
     const streakK = Math.min(1, Math.max(0, (k - 0.5) / 0.5)); // clamp: el boost pasa max
     this.streakMat.opacity = streakK * 0.32;
     if (this.streakMat.opacity > 0.01) {
-      const adv = dt * (0.5 + 1.6 * streakK);
+      const adv = dt * (0.6 + 1.8 * streakK);
       for (const s of this.streaks) {
         let p = s.userData.p + adv;
-        if (p > 1) { p -= 1; s.userData.angle = Math.random() * Math.PI * 2; }
+        if (p > 1) { p -= 1; s.userData.slot = -1.2 + Math.random() * 3.0; }
         s.userData.p = p;
-        const a = s.userData.angle;
-        const r = 0.3 + p * p * 3.4;         // se abre acelerando hacia afuera
-        s.position.set(Math.cos(a) * r, Math.sin(a) * r, -8.5 + p * 8.6); // viene hacia la cámara
-        s.rotation.z = a - Math.PI / 2;       // el largo apunta radialmente
-        s.scale.y = 0.6 + p * 3.2;            // se estira al acercarse
+        const side = s.userData.side;
+        // nacen cerca del borde y se van hacia afuera + hacia la cámara (por los lados)
+        s.position.set(side * (1.7 + p * p * 2.3), s.userData.slot, -7.5 + p * 8);
+        s.rotation.z = side * 0.14;            // casi verticales, apenas abiertas
+        s.scale.y = 0.7 + p * 3.4;             // se estiran al acercarse
       }
     }
   }
