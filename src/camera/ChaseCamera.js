@@ -90,15 +90,15 @@ export class ChaseCamera {
     // encuadrarlo; en pantallas normales o cámara alta no cambia nada (tallEdge = 0).
     const lowCam = cam.pos[1] < 8.0;
     const tallEdge = lowCam ? (this.backScale - 1) * edge2 : 0;
-    const followCap = lowCam ? 0.99 : 0.95;
-    const followFrac = Math.min(followCap, cam.followX + (cam.followXEdge - cam.followX) * edge2 * this.backScale + tallEdge * 0.55);
+    const followCap = lowCam ? 0.97 : 0.95;
+    const followFrac = Math.min(followCap, cam.followX + (cam.followXEdge - cam.followX) * edge2 * this.backScale + tallEdge * 0.28);
     let lookFrac = Math.min(0.72, cam.lookFollowX + (cam.lookFollowXEdge - cam.lookFollowX) * edge2 * this.backScale);
-    // Clave del recorte en los extremos de pantallas largas: la cámara APUNTABA al
-    // centro de la vía (lookFrac << followFrac) → el coche se iba al borde. Acercamos
-    // la MIRA al seguimiento de posición en el borde para CENTRAR el coche (los carriles
-    // del medio y las pantallas normales conservan el encuadre hacia el centro).
+    // En los extremos de pantallas largas la cámara APUNTABA al centro de la vía
+    // (lookFrac << followFrac) y el coche se iba al borde. Acercamos la MIRA al
+    // seguimiento de posición SOLO UN POCO (no se centra del todo: conserva algo de
+    // encuadre hacia el centro). Carriles del medio / pantallas normales: sin cambios.
     if (lowCam) {
-      const pull = Math.min(1, tallEdge * 3);
+      const pull = Math.min(0.4, tallEdge * 1.2);
       lookFrac += (followFrac - lookFrac) * pull;
     }
 
