@@ -215,41 +215,53 @@ function paintRoadCanvas(W, H, roadW, roadL, rng, anisotropy) {
 }
 
 // Terreno de arena/badlands que rodea la autopista (se repite y scrollea)
-export function createGroundTexture({ size = 512, anisotropy = 4 } = {}) {
+export function createGroundTexture({ size = 1024, anisotropy = 4 } = {}) {
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext('2d');
   const rng = makeRng(4242);
 
-  // Arena más clara y saturada que el asfalto (contraste carretera/desierto)
-  ctx.fillStyle = '#d2a873';
+  // Arena cálida (base). Contraste con el asfalto.
+  ctx.fillStyle = '#c7a06d';
   ctx.fillRect(0, 0, size, size);
 
-  for (let i = 0; i < 22; i++) {
-    const g = ctx.createRadialGradient(
-      rng() * size, rng() * size, 4,
-      rng() * size, rng() * size, 60 + rng() * 130
-    );
-    const dark = rng() < 0.55;
-    g.addColorStop(0, dark ? 'rgba(150,110,66,0.24)' : 'rgba(244,216,168,0.24)');
-    g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, size, size);
+  // Ondulación de dunas TILEABLE: senos con frecuencias ENTERAS → periódicos, así
+  // no hay costura ni patrón repetido evidente al mosaicar (era lo que se "veía raro").
+  const img = ctx.getImageData(0, 0, size, size);
+  const d = img.data;
+  const TAU = Math.PI * 2;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const u = x / size, v = y / size;
+      // rizos cruzados de arena barrida por el viento
+      const rip =
+        Math.sin((u * 7 + v * 3) * TAU) * 0.5 +
+        Math.sin((u * 3 - v * 9) * TAU) * 0.32 +
+        Math.sin((u * 13 + v * 11) * TAU) * 0.14;
+      const shade = rip * 11;
+      const i = (y * size + x) * 4;
+      d[i]     = Math.max(0, Math.min(255, d[i]     + shade));
+      d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + shade * 0.88));
+      d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + shade * 0.66));
+    }
   }
+  ctx.putImageData(img, 0, 0);
 
-  // Vetas alargadas en la dirección de marcha: venden el movimiento del suelo
-  for (let i = 0; i < 26; i++) {
-    ctx.fillStyle = `rgba(${rng() < 0.5 ? '150,110,66' : '240,210,160'},${0.08 + rng() * 0.08})`;
-    const sx = rng() * size;
-    const sy = rng() * size;
-    ctx.fillRect(sx, sy, 4 + rng() * 10, 60 + rng() * 150);
-  }
-
-  for (let i = 0; i < 2600; i++) {
+  // Grano fino denso (sin costura por ser pequeño y abundante)
+  for (let i = 0; i < 12000; i++) {
     ctx.fillStyle = rng() < 0.5
-      ? `rgba(110,80,48,${0.08 + rng() * 0.12})`
-      : `rgba(246,220,176,${0.07 + rng() * 0.1})`;
-    ctx.fillRect(rng() * size, rng() * size, 1 + rng() * 2, 1 + rng() * 2);
+      ? `rgba(120,88,52,${0.05 + rng() * 0.1})`
+      : `rgba(248,224,182,${0.05 + rng() * 0.09})`;
+    ctx.fillRect(rng() * size, rng() * size, 1 + rng() * 1.6, 1 + rng() * 1.6);
+  }
+
+  // Piedritas/guijarros dispersos con leve sombra (dan escala y realismo)
+  for (let i = 0; i < 220; i++) {
+    const px = rng() * size, py = rng() * size, r = 1.5 + rng() * 3.5;
+    ctx.fillStyle = `rgba(70,52,34,${0.12 + rng() * 0.12})`;
+    ctx.beginPath(); ctx.arc(px + r * 0.5, py + r * 0.5, r, 0, TAU); ctx.fill(); // sombra
+    ctx.fillStyle = rng() < 0.5 ? 'rgba(150,120,84,0.5)' : 'rgba(196,168,124,0.55)';
+    ctx.beginPath(); ctx.arc(px, py, r, 0, TAU); ctx.fill();
   }
 
   const tex = new THREE.CanvasTexture(canvas);

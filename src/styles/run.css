@@ -390,11 +390,25 @@
 }
 
 #run-fuel .fuel-ico {
-  width: 13px;
-  height: 13px;
-  color: #cfd3da;
+  width: 14px;
+  height: 14px;
+  color: #6fdc5a;
   flex: none;
 }
+
+#run-fuel-pct {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 12px;
+  font-weight: 900;
+  color: #eef0f4;
+  min-width: 26px;
+  text-align: right;
+  line-height: 1;
+}
+#run-fuel-pct small { font-size: 8px; opacity: 0.7; margin-left: 1px; }
+#run-fuel.low .fuel-ico { color: #ff6a52; }
+#run-fuel.low #run-fuel-pct { color: #ff8a72; }
 
 .fuel-track {
   width: 88px;

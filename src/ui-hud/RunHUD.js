@@ -40,6 +40,7 @@ export class RunHUD {
         <div id="run-fuel" aria-label="Combustible">
           <svg class="fuel-ico" viewBox="0 0 24 24" fill="currentColor"><path d="M6 3h6a1 1 0 0 1 1 1v16H5V4a1 1 0 0 1 1-1zm1 2v4h4V5zm9.5 3.7L18 7.2v9.6a1.1 1.1 0 0 0 2.2 0V10a1.4 1.4 0 0 0-.5-1.1zM4 20h10v1.4H4z"/></svg>
           <div class="fuel-track"><div id="run-fuel-fill"></div></div>
+          <b id="run-fuel-pct">100<small>%</small></b>
         </div>
         <div id="run-shield" hidden>🛡<b id="run-shield-n">0</b></div>
         <div id="run-abilities">
@@ -108,6 +109,7 @@ export class RunHUD {
         speed: this.root.querySelector('#run-speed-val'),
         fuel: this.root.querySelector('#run-fuel'),
         fuelFill: this.root.querySelector('#run-fuel-fill'),
+        fuelPct: this.root.querySelector('#run-fuel-pct'),
         pause: this.root.querySelector('#run-pause'),
         pauseDist: this.root.querySelector('#pause-distance'),
         pauseBest: this.root.querySelector('#pause-best'),
@@ -191,6 +193,7 @@ export class RunHUD {
         : p < 45 ? 'linear-gradient(90deg,#c9871a,#f5c542)'
         : 'linear-gradient(90deg,#2f9c3c,#6fdc5a)';
       this.el.fuel.classList.toggle('low', p < 20);
+      if (this.el.fuelPct && this.el.fuelPct.childNodes[0]) this.el.fuelPct.childNodes[0].nodeValue = String(Math.round(p));
     }
     // Texto a ~5 Hz: el DOM no necesita 60 fps
     this.acc += 1;

@@ -1,9 +1,11 @@
 import { ICONS, carSilhouette } from './icons.js';
+import { getCarThumbnail } from '../vehicles/CarThumbnails.js';
 import { VEHICLE_UPGRADES, VEHICLE_STATS, GARAGE_CARS } from '../vehicles/VehicleConfig.js';
 import { TURRETS, TURRET_NAMES } from '../vehicles/TurretData.js';
 import { PlayerState } from '../save/PlayerState.js';
 import { ensureDailyMissions, claimMission } from '../save/Missions.js';
 import { SHOP_BUNDLES, CRATES, EVENTS, buyBundle, openCrate, claimEventMilestone, canAfford } from '../save/Economy.js';
+import { FUEL_UPGRADE, fuelUpgradeLevel, computeFuelMax, fuelUpgradeCost, buyFuelUpgrade } from '../save/ShopFuelUpgrade.js';
 
 // Metadatos de presentación de cada mejora (los niveles viven en PlayerState.upgrades)
 const UPGRADE_META = {
@@ -95,7 +97,7 @@ export class LobbyUI {
     this.root.classList.toggle('view-upgrades', view === 'upgrades');
     this.root.classList.toggle('view-turrets', view === 'turrets');
     if (view === 'upgrades') this.selectUpgrade(this.selected);
-    if (view === 'cars') document.getElementById('cars-row').innerHTML = this.renderCars();
+    if (view === 'cars') { document.getElementById('cars-row').innerHTML = this.renderCars(); this.hydrateCarThumbnails(); }
     if (view === 'turrets') document.getElementById('turrets-row').innerHTML = this.renderTurrets();
     this.onViewChange(view);
     requestAnimationFrame(() => this.positionToast());
@@ -372,6 +374,27 @@ export class LobbyUI {
     }).join('');
   }
 
+  // Reemplaza la silueta genérica por una miniatura 3D REAL de cada coche (render
+  // del GLB → PNG cacheado). Progresivo: la silueta se ve al instante y la imagen
+  // real entra cuando termina de cargar. Secuencial → no carga los 5 GLB a la vez.
+  async hydrateCarThumbnails() {
+    const row = document.getElementById('cars-row');
+    if (!row) return;
+    const cards = [...row.querySelectorAll('.car-card[data-action="car"]')];
+    for (const card of cards) {
+      const id = card.dataset.id;
+      if (!id || card.dataset.thumbed) continue;
+      let url = null;
+      try { url = await getCarThumbnail(id); } catch (e) { url = null; }
+      // La vista pudo cambiar mientras cargaba
+      if (!document.body.contains(card)) continue;
+      if (url) {
+        const thumb = card.querySelector('.car-thumb');
+        if (thumb) { thumb.innerHTML = `<img class="car-thumb-img" src="${url}" alt="">`; card.dataset.thumbed = '1'; }
+      }
+    }
+  }
+
   renderTurrets() {
     const turretList = TURRETS.length > 0 ? TURRETS : Object.entries(TURRET_NAMES).map(([id, name]) => ({
       id, name, unlocked: true
@@ -505,6 +528,9 @@ export class LobbyUI {
           break;
         case 'buy-bundle':
           this.doBuyBundle(el.dataset.id);
+          break;
+        case 'buy-fuel':
+          this.doBuyFuel();
           break;
         case 'open-crate':
           this.doOpenCrate(el.dataset.id);
@@ -652,8 +678,39 @@ export class LobbyUI {
     }).join('');
     return `
       <h2>Tienda</h2>
+      ${this.renderFuelUpgrade()}
       <p class="sec-sub">Cambia gemas por monedas y consigue ventajas</p>
       <div class="shop-grid">${cards}</div>`;
+  }
+
+  // Mejora de capacidad de tanque (combustible): sube el techo del tanque por nivel.
+  renderFuelUpgrade() {
+    const lvl = fuelUpgradeLevel(this.state);
+    const max = computeFuelMax(this.state);
+    const atMax = lvl >= FUEL_UPGRADE.maxLevel;
+    const cost = fuelUpgradeCost(lvl);
+    const afford = (this.state.coins || 0) >= cost;
+    const cta = atMax
+      ? `<span class="fuel-up-max">MÁX</span>`
+      : `<button class="btn-primary fuel-up-btn" data-action="buy-fuel" ${afford ? '' : 'disabled'}>MEJORAR <span class="cost">${ICONS.coin}${fmt(cost)}</span></button>`;
+    return `
+      <div class="fuel-up-card">
+        <span class="fuel-up-ic">${ICONS.fuel}</span>
+        <div class="fuel-up-info">
+          <div class="fuel-up-tt">Capacidad de tanque · Nv ${lvl}/${FUEL_UPGRADE.maxLevel}</div>
+          <div class="fuel-up-sub">Tanque máximo: <b>${max}</b> · aguantas más entre bidones</div>
+        </div>
+        ${cta}
+      </div>`;
+  }
+
+  doBuyFuel() {
+    const r = buyFuelUpgrade(this.state);
+    if (r.error === 'max') { this.toast('Tanque al máximo'); return; }
+    if (r.error === 'insufficient') { this.toast('Monedas insuficientes'); return; }
+    this.state.maxFuel = r.max; // reflejar el nuevo tope en el estado del jugador
+    this.persistAndRefresh();
+    this.toast(`Tanque mejorado a Nv ${r.level} · ${r.max} de capacidad`);
   }
 
   renderCrates() {
@@ -861,7 +918,7 @@ export class LobbyUI {
   refreshCarCards() {
     // Re-render completo de la fila (cambian los pies: comprar → USAR → EQUIPADO)
     const row = document.getElementById('cars-row');
-    if (row) row.innerHTML = this.renderCars();
+    if (row) { row.innerHTML = this.renderCars(); this.hydrateCarThumbnails(); }
   }
 
   async handleTurret(turretId, cardEl) {

@@ -26,7 +26,8 @@
    mantiene el look. font-display: swap → nunca bloquea el render. */
 @font-face {
   font-family: 'Road Rage';
-  src: url('/fonts/road-rage.woff2') format('woff2'),
+  src: url('/fonts/road-rage.otf') format('opentype'),
+       url('/fonts/road-rage.woff2') format('woff2'),
        url('/fonts/road-rage.ttf') format('truetype');
   font-weight: 400 900;
   font-display: swap;
@@ -1066,6 +1067,17 @@ button {
   display: block;
 }
 
+/* Miniatura 3D real del coche (render del GLB) */
+.car-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5));
+  animation: car-thumb-in 0.3s ease;
+}
+@keyframes car-thumb-in { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: none; } }
+
 .car-card.locked .car-thumb {
   filter: grayscale(0.85) brightness(0.6);
 }
@@ -1504,6 +1516,31 @@ button {
   to { opacity: 1; transform: none; }
 }
 
+/* Tienda — mejora de capacidad de tanque */
+.fuel-up-card {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 12px;
+  margin-bottom: 10px;
+  border-radius: 14px;
+  border: 1px solid var(--panel-border);
+  border-left: 3px solid var(--green);
+  background:
+    linear-gradient(150deg, rgba(63, 196, 79, 0.12), transparent 55%),
+    rgba(14, 15, 20, 0.7);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+.fuel-up-ic svg { width: 30px; height: 30px; color: var(--green); filter: drop-shadow(0 0 6px rgba(63, 196, 79, 0.5)); }
+.fuel-up-info { flex: 1; min-width: 0; }
+.fuel-up-tt { font-family: var(--font-display); font-style: italic; font-size: 14px; font-weight: 900; letter-spacing: 0.4px; }
+.fuel-up-sub { font-size: 9.5px; color: var(--txt-dim); margin-top: 2px; }
+.fuel-up-sub b { color: var(--green); }
+.fuel-up-btn { padding: 9px 12px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.fuel-up-btn .cost { display: inline-flex; align-items: center; gap: 2px; }
+.fuel-up-btn .cost svg { width: 12px; height: 12px; }
+.fuel-up-max { font-size: 11px; font-weight: 900; color: var(--green); letter-spacing: 1px; }
+
 /* Tienda */
 .shop-grid {
   display: grid;
@@ -1613,32 +1650,46 @@ button {
 }
 
 /* Eventos */
+/* Eventos — tarjetas "Survival Drive" (a juego con las misiones) */
 .ev-card {
-  background: rgba(255, 255, 255, 0.03);
+  position: relative;
+  background:
+    linear-gradient(150deg, rgba(245, 179, 1, 0.1), transparent 55%),
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.02) 0 8px, transparent 8px 16px),
+    rgba(14, 15, 20, 0.7);
   border: 1px solid var(--panel-border);
-  border-radius: 13px;
-  padding: 11px;
+  border-left: 3px solid var(--gold);
+  border-radius: 14px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 9px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
 }
 .ev-head {
   display: flex;
-  gap: 9px;
+  gap: 10px;
   align-items: center;
 }
 .ev-ic svg {
-  width: 26px;
-  height: 26px;
-  color: var(--gold);
+  width: 30px;
+  height: 30px;
+  color: var(--gold-hi);
+  filter: drop-shadow(0 0 6px rgba(245, 179, 1, 0.5));
 }
 .ev-tt {
-  font-size: 12.5px;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 15px;
   font-weight: 900;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 .ev-desc {
   font-size: 9.5px;
   color: var(--txt-dim);
+  letter-spacing: 0.3px;
 }
 .ev-steps {
   display: flex;
@@ -1651,15 +1702,21 @@ button {
   align-items: center;
   gap: 8px;
   font-size: 10.5px;
-  padding: 6px 8px;
-  background: rgba(0, 0, 0, 0.25);
-  border-radius: 9px;
+  padding: 7px 9px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
 }
 .ev-step.ready {
-  box-shadow: 0 0 0 1px var(--gold) inset;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px var(--gold) inset, 0 0 14px rgba(245, 179, 1, 0.35);
+  animation: ev-ready-pulse 1.2s ease-in-out infinite;
 }
+@keyframes ev-ready-pulse { 0%, 100% { box-shadow: 0 0 0 1px var(--gold) inset, 0 0 10px rgba(245,179,1,0.25); } 50% { box-shadow: 0 0 0 1px var(--gold) inset, 0 0 18px rgba(245,179,1,0.5); } }
 .ev-goal {
-  font-weight: 800;
+  font-weight: 900;
+  font-family: var(--font-display);
+  font-style: italic;
 }
 .ev-rw {
   display: flex;
@@ -1667,7 +1724,7 @@ button {
   color: var(--gold-hi);
 }
 .ev-step .btn-primary {
-  padding: 5px 9px;
+  padding: 6px 11px;
   font-size: 9.5px;
 }
 

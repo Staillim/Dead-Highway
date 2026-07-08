@@ -1,17 +1,13 @@
 # Fuentes del HUD
 
-Coloca aquí la fuente display **Road Rage** para los marcadores del juego
-(PUNTOS, COMBO, OLEADA, pantalla de muerte). El CSS ya la referencia vía
-`--font-display` con `@font-face` en `src/styles/lobby.css`.
+**`road-rage.otf`** — fuente display "Road Rage" de **Youssef Habchi** (© 2016), usada en los
+marcadores del juego (PUNTOS, COMBO, OLEADA, distancia, velocidad, pantalla de muerte,
+tarjetas de tienda/eventos). Se sirve en `/fonts/road-rage.otf` (`publicDir: assets`) y la
+activa `--font-display` con el `@font-face` de `src/styles/lobby.css`.
 
-Archivos esperados (cualquiera de los dos, woff2 preferido):
+> ⚠️ **Licencia: uso PERSONAL únicamente.** Para uso comercial hay que obtener licencia del
+> autor: contact@youssef-habchi.com · http://youssef-habchi.com
 
-- `road-rage.woff2`
-- `road-rage.ttf`
-
-En cuanto dejes el archivo aquí (se sirve en `/fonts/…` porque `publicDir: assets`),
-la tipografía se activa sola — no hay que tocar código. Sin el archivo, el HUD
-usa un fallback condensado/pesado (Impact / Arial Narrow) que conserva el look.
-
-> Descárgala de una fuente confiable con licencia adecuada (p. ej. la página
-> oficial del autor). No la incluyo en el repo por licencia/seguridad.
+Si se quita el archivo, el HUD cae en un stack condensado/pesado (Impact / Arial Narrow) que
+conserva el look. Se pueden añadir `road-rage.woff2` / `road-rage.ttf` (el `@font-face` ya los
+referencia) para menor peso.

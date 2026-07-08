@@ -136,3 +136,25 @@ Las **ambulancias** se estiran solo en el largo (`stretch` → `holder.scale.z`,
 ensanchar). Todos los vehículos llevan **faros, luces traseras y barra de emergencia**
 (ambulancias/bomberos) horneados en UNA malla fusionada con `vertexColors` (1 draw call por
 vehículo, material unlit compartido).
+
+## 🚗 Miniaturas 3D de coches — `src/vehicles/CarThumbnails.js`
+
+Las tarjetas del garaje muestran una **render REAL** del GLB de cada coche (no una silueta).
+Un pequeño renderer offscreen + estudio neutro (`RoomEnvironment`) rasteriza cada coche a un
+PNG (dataURL) cacheado; `LobbyUI.hydrateCarThumbnails()` sustituye la silueta de forma
+progresiva. El mapeo id→archivo vive en `CAR_MODEL_FILES` (VehicleConfig).
+
+## ⛽ Tienda de combustible + fuente real
+
+- **Capacidad de tanque** comprable (`ShopFuelUpgrade.js`): tarjeta en la Tienda que sube el
+  tope del tanque por nivel (`computeFuelMax`, aplicado por la partida vía `controller.fuelMax`).
+- **Indicador de gasolina** en la partida ahora muestra **% numérico** + icono GAS.
+- **Fuente Road Rage** (Youssef Habchi) instalada en `assets/fonts/road-rage.otf` y activa vía
+  `--font-display`. ⚠️ Licencia: **uso personal**; para uso comercial hace falta licencia del autor.
+
+## 🏜️ Arena tileable + tarjetas Survival Drive
+
+- Textura de suelo regenerada (1024²) con **rizos de duna periódicos** (senos de frecuencia
+  entera → sin costura ni patrón repetido); antes se veía "rara" por blobs que se repetían.
+- Tarjetas de **Eventos** al estilo Survival Drive (acento, glifo, tipografía display, pulso
+  de "listo para reclamar"), a juego con las de Misiones.
