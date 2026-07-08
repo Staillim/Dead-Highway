@@ -25,12 +25,15 @@ export class RunHUD {
     if (!this.mountedOnce) {
       this.root.innerHTML = `
         <div id="run-hud">
-          <button id="run-pause-btn" aria-label="Pausa">${PAUSE_ICON}</button>
-          <div class="run-chip" id="run-hearts">❤❤❤</div>
+          <div class="hud-group">
+            <button id="run-pause-btn" aria-label="Pausa">${PAUSE_ICON}</button>
+            <div class="run-chip" id="run-hearts">❤❤❤</div>
+            <div class="run-chip" id="run-score"><b id="run-score-val">0</b><small>PTS</small></div>
+          </div>
           <div class="run-chip" id="run-distance"><span id="run-distance-val">0 m</span><small>DISTANCIA</small></div>
-          <div class="run-chip" id="run-speed">0 km/h</div>
+          <div class="run-chip" id="run-speed"><b id="run-speed-val">0</b><small>KM/H</small></div>
         </div>
-        <div id="run-score"><b id="run-score-val">0</b><span>PUNTOS</span></div>
+        <div id="run-flash"></div>
         <div id="run-combo" hidden><b id="run-combo-mult">x2</b><span>COMBO</span></div>
         <div id="run-wave" hidden><span>OLEADA</span><b id="run-wave-n">1</b></div>
         <div id="run-fuel" aria-label="Combustible">
@@ -76,6 +79,7 @@ export class RunHUD {
         score: this.root.querySelector('#run-score-val'),
         combo: this.root.querySelector('#run-combo'),
         comboMult: this.root.querySelector('#run-combo-mult'),
+        flash: this.root.querySelector('#run-flash'),
         wave: this.root.querySelector('#run-wave'),
         waveN: this.root.querySelector('#run-wave-n'),
         abMissile: this.root.querySelector('#ab-missile'),
@@ -83,7 +87,7 @@ export class RunHUD {
         abMissileCd: this.root.querySelector('#ab-missile-cd'),
         abEmpCd: this.root.querySelector('#ab-emp-cd'),
         dist: this.root.querySelector('#run-distance-val'),
-        speed: this.root.querySelector('#run-speed'),
+        speed: this.root.querySelector('#run-speed-val'),
         fuel: this.root.querySelector('#run-fuel'),
         fuelFill: this.root.querySelector('#run-fuel-fill'),
         pause: this.root.querySelector('#run-pause'),
@@ -134,7 +138,7 @@ export class RunHUD {
     if (this.acc < 60 / GAMEPLAY.hud.textHz) return;
     this.acc = 0;
     this.el.dist.textContent = formatDistance(snapshot.distance);
-    this.el.speed.textContent = `${snapshot.kmh} km/h`;
+    this.el.speed.textContent = `${snapshot.kmh}`;
   }
 
   setHearts(hp, max) {
@@ -160,16 +164,24 @@ export class RunHUD {
     this._waveT = setTimeout(() => { if (this.el?.wave) this.el.wave.hidden = true; }, 1800);
   }
 
-  // Combo/score: actualiza los puntos y el popup de multiplicador
+  // Combo/score: puntos + popup de multiplicador con color por tier (dopamina)
   setCombo(combo, mult, score) {
     if (!this.el) return;
     this.el.score.textContent = fmt(score);
     if (combo >= 2 && mult >= 2) {
       this.el.combo.hidden = false;
       this.el.comboMult.textContent = `x${mult}`;
+      this.el.combo.dataset.tier = mult >= 6 ? 'hot' : mult >= 4 ? 'warm' : 'base';
       this.el.combo.classList.remove('pop');
       void this.el.combo.offsetWidth;
       this.el.combo.classList.add('pop');
+      // Destello de pantalla que crece con el multiplicador
+      if (this.el.flash) {
+        this.el.flash.style.setProperty('--peak', Math.min(0.5, 0.1 + mult * 0.05));
+        this.el.flash.classList.remove('on');
+        void this.el.flash.offsetWidth;
+        this.el.flash.classList.add('on');
+      }
     } else if (combo === 0) {
       this.el.combo.hidden = true;
     }
