@@ -11,6 +11,17 @@ export function awardRunRewards(state, distanceM) {
   state.coins = (state.coins || 0) + coins;
   state.gems = (state.gems || 0) + gems;
 
+  // Nivel del jugador: gana XP por distancia y sube de nivel
+  const xpGain = Math.round(dist * 0.15) + 20;
+  state.xp = (state.xp || 0) + xpGain;
+  const levelsUp = [];
+  while (state.xp >= (state.maxXp || 5000)) {
+    state.xp -= state.maxXp;
+    state.level = (state.level || 1) + 1;
+    state.maxXp = Math.round((state.maxXp || 5000) * 1.1);
+    levelsUp.push(state.level);
+  }
+
   // Pase de batalla: acumular XP y subir de nivel
   const bp = state.battlePass || { level: 1, xp: 0, maxXp: 500 };
   bp.xp += bpXp;

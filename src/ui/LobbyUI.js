@@ -107,6 +107,27 @@ export class LobbyUI {
       const label = document.querySelector('.pass-label');
       if (label) label.textContent = `${fmt(bp.xp)} / ${fmt(bp.maxXp)}`;
     }
+    // Nivel del jugador (por si subió con la última carrera)
+    const lb = document.querySelector('.level-badge');
+    if (lb) lb.textContent = s.level;
+    const xf = document.querySelector('.xp-fill');
+    if (xf) xf.style.width = `${Math.round((s.xp / s.maxXp) * 100)}%`;
+    const xl = document.querySelector('.xp-label');
+    if (xl) xl.textContent = `Nivel ${s.level} · ${fmt(s.xp)}/${fmt(s.maxXp)} XP`;
+  }
+
+  // Editar el nombre del superviviente
+  editName() {
+    const cur = this.state.name || 'SURVIVOR';
+    const next = window.prompt('Tu nombre de superviviente:', cur);
+    if (next != null) {
+      const clean = next.trim().slice(0, 16) || 'SURVIVOR';
+      this.state.name = clean;
+      PlayerState.save(this.state);
+      const el = document.querySelector('.player-name .pn-text');
+      if (el) el.textContent = clean;
+      this.toast('Nombre actualizado');
+    }
   }
 
   positionToast() {
@@ -129,11 +150,11 @@ export class LobbyUI {
     return `
       <header id="hud-header" class="anim-in" style="--d:0s">
         <div class="player-chip">
-          <div class="avatar">${ICONS.avatar}<span class="level-badge">${s.level}</span></div>
+          <div class="avatar">${ICONS.avatar}<span class="level-badge" title="Nivel">${s.level}</span></div>
           <div class="player-info">
-            <span class="player-name">${s.name}</span>
+            <button class="player-name" data-action="edit-name" title="Editar nombre"><b class="pn-text">${s.name}</b><span class="pn-edit">✎</span></button>
             <div class="xp-bar"><div class="xp-fill" style="width:${xpPct}%"></div></div>
-            <span class="xp-label">${fmt(s.xp)} / ${fmt(s.maxXp)}</span>
+            <span class="xp-label">Nivel ${s.level} · ${fmt(s.xp)}/${fmt(s.maxXp)} XP</span>
           </div>
         </div>
         <div class="res-chips">
@@ -461,6 +482,9 @@ export class LobbyUI {
           break;
         case 'settings':
           this.toast('Ajustes: próximamente');
+          break;
+        case 'edit-name':
+          this.editName();
           break;
         case 'offer':
           this.toast('Ofertas especiales: próximamente');
