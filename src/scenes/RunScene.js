@@ -27,6 +27,7 @@ import { PlayerState } from '../save/PlayerState.js';
 import { computeUpgradeStats } from '../save/UpgradeStats.js';
 import { awardRunRewards } from '../save/Rewards.js';
 import { applyRunToMissions } from '../save/Missions.js';
+import { RunPickups } from '../collectibles/RunPickups.js';
 
 const DEBUG = new URLSearchParams(location.search).has('debug');
 
@@ -142,6 +143,21 @@ export class RunScene {
       }
     });
     await this.pickups.load();
+    // Recolectables extra: monedas / gemas / botiquín
+    this.runPickups = new RunPickups(this.scene, {
+      onCoin: (value, x, z) => {
+        this.runBonusCoins = (this.runBonusCoins || 0) + value;
+        this.score = (this.score || 0) + value;
+        this.hud.setCombo(this.combo || 0, Math.min(GAMEPLAY.combo.maxMult, 1 + Math.floor((this.combo || 0) / GAMEPLAY.combo.killsPerTier)), this.score);
+        this.speedFx.burst(x, z, 3);
+      },
+      onGem: (value, x, z) => { this.runBonusGems = (this.runBonusGems || 0) + value; this.speedFx.burst(x, z, 4); this.chaseCamera.addImpulse(0.2); },
+      onMedkit: (x, z) => {
+        if (this.hp < this.maxHp) { this.hp += 1; this.hud.setHearts(this.hp, this.maxHp); }
+        this.speedFx.burst(x, z, 6); this.chaseCamera.addImpulse(0.3);
+      }
+    });
+    await this.runPickups.load();
     this.hp = this.maxHp;
     this.mid = new MidProps(this.scene);
     this.near = new NearProps(this.scene);
@@ -265,6 +281,8 @@ export class RunScene {
     this.obstacles.reset();
     this.traffic.reset();
     this.pickups.reset();
+    this.runPickups.reset();
+    this.runBonusCoins = 0; this.runBonusGems = 0;
     // Soltar zombis agarrados del carro antes de reciclar
     for (const z of this.latched) this.vehicle.object3D.remove(z.holder);
     this.latched.length = 0;
@@ -483,6 +501,11 @@ export class RunScene {
     this.lastRewards = awardRunRewards(this.state, dist);
     const scoreCoins = Math.round(score * GAMEPLAY.combo.coinsPerScore);
     if (scoreCoins > 0) { this.state.coins += scoreCoins; this.lastRewards.coins += scoreCoins; }
+    // Monedas/gemas recogidas en la ruta
+    const pk = Math.round(this.runBonusCoins || 0);
+    const pg = Math.round(this.runBonusGems || 0);
+    if (pk > 0) { this.state.coins += pk; this.lastRewards.coins += pk; }
+    if (pg > 0) { this.state.gems = (this.state.gems || 0) + pg; this.lastRewards.gems += pg; }
     this.lastRewards.score = score;
     PlayerState.save(this.state);
     this.onExit?.();
@@ -506,6 +529,7 @@ export class RunScene {
       const tc = this.traffic.update(dt, speed, this.laneSystem);
       if (tc) this.onCrash();
       this.pickups.update(dt, speed, this.laneSystem, this.controller.snapshot().fuelPct);
+      this.runPickups.update(dt, speed, this.laneSystem);
       if (this.controller.outOfFuel && speed < 0.6) this.endRun(); // se quedó sin gasolina
 
       // Zombis + combate (el mundo los trae; la torreta los mata; los gibs vuelan)

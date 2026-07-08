@@ -175,15 +175,31 @@ renderer.domElement.addEventListener('pointerup', (e) => {
 
 function viewportClick(e) {
   if (transform.dragging) return;
-  if (!state.accessoryModel || !WEAPON_CATEGORIES.has(state.currentCategory)) return;
 
   const rect = renderer.domElement.getBoundingClientRect();
   const mouse = new THREE.Vector2(
     ((e.clientX - rect.left) / rect.width) * 2 - 1,
     -((e.clientY - rect.top) / rect.height) * 2 + 1
   );
-
   raycaster.setFromCamera(mouse, camera);
+
+  // 1) Extras (luz / humo / rueda): seleccionables en cualquier categoría. Se
+  //    testean primero para poder engancharlos con el gizmo aunque haya un
+  //    accesorio cargado. El hit puede caer en una malla hija → subir al marcador.
+  const extraObjs = allExtraObjects();
+  if (extraObjs.length > 0) {
+    const extraHits = raycaster.intersectObjects(extraObjs, true);
+    if (extraHits.length > 0) {
+      const marker = findExtraMarker(extraHits[0].object);
+      if (marker) { selectExtra(marker.userData.extraGroup, marker.userData.data); return; }
+    }
+  }
+  // Si había un extra seleccionado y clicamos al vacío, lo soltamos (y el gizmo
+  // vuelve al accesorio) antes de seguir con la lógica de muzzles.
+  if (state.selectedExtra) deselectExtra();
+
+  // 2) Muzzles (solo armas): lógica existente sin cambios de comportamiento.
+  if (!state.accessoryModel || !WEAPON_CATEGORIES.has(state.currentCategory)) return;
   const indicators = [];
   state.accessoryModel.traverse((child) => {
     if (child.name === 'muzzleIndicator') indicators.push(child);
@@ -421,6 +437,7 @@ function removeMuzzle() {
 }
 
 function selectMuzzle(idx) {
+  clearExtraSelectionUI();   // el gizmo pasa al muzzle; soltar extra seleccionado
   if (idx === state.currentMuzzleIdx) {
     state.currentMuzzleIdx = -1;
     hideMuzzleControls();
@@ -718,7 +735,8 @@ function updateJsonOutput() {
     carId: state.currentCarId,
     sockets: state.socketData,
     overrides: state.overrides,
-    compatibility: state.compatibility
+    compatibility: state.compatibility,
+    extras: state.extras
   };
   jsonOutputEl.value = JSON.stringify(payload, null, 2);
 }
@@ -769,6 +787,8 @@ async function selectCar(carId) {
   state.muzzles = [];
   state.currentMuzzleIdx = -1;
   clearMuzzleIndicators();
+  clearExtraObjects();            // soltar luces/humo/ruedas del carro anterior
+  state._carLocalBox = null;      // invalidar la medida cacheada del carro
   transform.detach();
   updateMuzzleSection();
 
@@ -810,6 +830,9 @@ async function selectCar(carId) {
     // Crear cilindro selector de mallas
     createSelectorCylinder();
 
+    // Reconstruir los extras (luces/humo/llantas) guardados sobre este carro
+    rebuildExtraObjects();
+
     // Si hay un accesorio cargado, recargarlo en el nuevo carro
     if (state.currentAccessoryId) {
       await loadAccessory(state.currentAccessoryId);
@@ -837,6 +860,7 @@ async function loadSavedSockets(carId) {
       state.overrides = data.overrides || {};
       state.compatibility = data.compatibility || {};
       state.meshGroups = data.meshGroups || { wheels: [], turretPart: [], hoodPart: [] };
+      state.extras = normalizeExtras(data.extras);
       initCompatibility();
       return;
     }
@@ -853,6 +877,7 @@ async function loadSavedSockets(carId) {
       state.overrides = data.overrides || {};
       state.compatibility = data.compatibility || {};
       state.meshGroups = data.meshGroups || { wheels: [], turretPart: [], hoodPart: [] };
+      state.extras = normalizeExtras(data.extras);
       initCompatibility();
       return;
     } catch (e) {
@@ -865,6 +890,7 @@ async function loadSavedSockets(carId) {
   state.overrides = {};
   state.compatibility = {};
   state.meshGroups = { wheels: [], turretPart: [], hoodPart: [] };
+  state.extras = emptyExtras();
   initCompatibility();
 }
 
@@ -886,6 +912,7 @@ function selectCategory(category) {
   state.currentMuzzleIdx = -1;
   clearMuzzleIndicators();
   transform.detach();
+  clearExtraSelectionUI();
   stopAnimPreview();
   updateMuzzleSection();
 
@@ -929,6 +956,7 @@ async function loadAccessory(accessoryId) {
   state.currentAccessoryId = accessoryId;
   state.currentlyOverridden = isAccessoryOverridden(state.currentCategory, accessoryId);
   buildAssetList();
+  clearExtraSelectionUI();   // el gizmo pasa al accesorio; soltar extra seleccionado
 
   if (state.accessoryModel) {
     state.accessoryModel.removeFromParent();
@@ -976,6 +1004,23 @@ function onTransformChanged() {
 
   if (attachedObj.name === 'selectorCylinder') {
     updateSelectorIntersection();
+    return;
+  }
+
+  // Extras (luz/humo/rueda): el gizmo se engancha directo al marcador. Guardamos
+  // su transform LOCAL (mismo criterio que un socket: el juego lo re-aplica sobre
+  // el carModel). La escala solo se persiste para ruedas.
+  if (attachedObj.userData && attachedObj.userData.extraGroup) {
+    const group = attachedObj.userData.extraGroup;
+    const data = attachedObj.userData.data;
+    if (data) {
+      data.position = [attachedObj.position.x, attachedObj.position.y, attachedObj.position.z];
+      data.rotation = [attachedObj.rotation.x, attachedObj.rotation.y, attachedObj.rotation.z];
+      if (group === 'wheels') data.scale = attachedObj.scale.x;
+      showExtraControls();
+      updateJsonOutput();
+      autoSaveSockets();
+    }
     return;
   }
 
@@ -1042,7 +1087,8 @@ function persistLocal() {
     sockets: state.socketData,
     overrides: state.overrides,
     compatibility: state.compatibility,
-    meshGroups: state.meshGroups
+    meshGroups: state.meshGroups,
+    extras: state.extras
   };
   localStorage.setItem(`dh_socket_${state.currentCarId}`, JSON.stringify(payload));
 }
@@ -1062,7 +1108,8 @@ async function saveToServer() {
     sockets: state.socketData,
     overrides: state.overrides,
     compatibility: state.compatibility,
-    meshGroups: state.meshGroups
+    meshGroups: state.meshGroups,
+    extras: state.extras
   };
   persistLocal();
   setSaveStatus('Guardando…', 'info');
@@ -1202,7 +1249,8 @@ function downloadJson() {
     sockets: state.socketData,
     overrides: state.overrides,
     compatibility: state.compatibility,
-    meshGroups: state.meshGroups
+    meshGroups: state.meshGroups,
+    extras: state.extras
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -1225,7 +1273,9 @@ function loadJsonFromText() {
       state.overrides = data.overrides || {};
       state.compatibility = data.compatibility || {};
       state.meshGroups = data.meshGroups || { wheels: [], turretPart: [], hoodPart: [] };
+      state.extras = normalizeExtras(data.extras);
       initCompatibility();
+      rebuildExtraObjects();
       state.currentlyOverridden = isAccessoryOverridden(state.currentCategory, state.currentAccessoryId);
       loadMuzzlesFromOverride();
       clearMuzzleIndicators();
@@ -1272,6 +1322,7 @@ function activateGroupSelector(group) {
   }
 
   deactivateGroupSelector();
+  clearExtraSelectionUI();   // el gizmo pasa al cilindro selector
   state.activeGroupSelector = group;
 
   document.querySelectorAll('.sg-btn').forEach((b) => b.classList.remove('active'));
@@ -1378,6 +1429,7 @@ function updateSelectorIntersection() {
   const contained = [];
   model.traverse((child) => {
     if (!child.isMesh) return;
+    if (child.userData.isExtra) return;   // no capturar luces/humo/ruedas del dev
     const cb = new THREE.Box3().setFromObject(child);
     const worldCenter = cb.getCenter(new THREE.Vector3());
     worldCenter.applyMatrix4(cylInv);
